@@ -327,8 +327,10 @@ class SettingsStore(
     /// An unrecognised raw value (a newer build's kind, then a downgrade) reads as the
     /// Progressor rather than refusing to build a client — the CONSERVATIVE direction
     /// `SessionKind` also follows.
+    ///
+    /// Grippy: nothing chosen yet means the WH-C06 crane scale, the gauge Grippy is built for.
     override fun load(): GaugeKind =
-        cachedGaugeKind?.let { GaugeKind.fromRaw(it) } ?: GaugeKind.progressor
+        cachedGaugeKind?.let { GaugeKind.fromRaw(it) } ?: GaugeKind.whc06
 
     override fun save(kind: GaugeKind) {
         cachedGaugeKind = kind.rawValue

@@ -51,8 +51,8 @@ fun HomeScreen(
             IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, "Settings", tint = c.text, modifier = Modifier.size(28.dp)) }
         }
         Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            // The scale.
-            OutlinedCard(radius = 28.dp) {
+            // The scale. Tapping the card opens Settings, where the gauge is chosen.
+            OutlinedCard(radius = 28.dp, onClick = onSettings) {
                 Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                     BoxedIcon(Icons.Outlined.Bluetooth, if (device.state.isConnected) c.blue else c.text2, c.raised, 52.dp)
                     Spacer(Modifier.width(14.dp))
