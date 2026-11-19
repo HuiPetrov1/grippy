@@ -138,9 +138,11 @@ fun MaxesTabScreen(
     /// The critical force test, for a grip and how its hands are tested. The host decides
     /// where it shows.
     onCriticalForce: (GripSpec, CriticalForceHands) -> Unit = { _, _ -> },
+    /// Grippy: Benchmarks opens from Home, so it carries a back arrow.
+    onBack: (() -> Unit)? = null,
 ) {
     MaxesOverview(onAddMax, onMeasure, onEdit, modifier = modifier,
-        feed = feed, onCriticalForce = onCriticalForce)
+        feed = feed, onCriticalForce = onCriticalForce, onBack = onBack)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -152,6 +154,7 @@ private fun MaxesOverview(
     modifier: Modifier = Modifier,
     feed: HistoryFeed = LocalHistoryFeed.current,
     onCriticalForce: (GripSpec, CriticalForceHands) -> Unit = { _, _ -> },
+    onBack: (() -> Unit)? = null,
 ) {
     val palette = LocalGripPalette.current
     val templates = LocalTemplateStore.current
@@ -185,6 +188,7 @@ private fun MaxesOverview(
         topBar = {
             LargeTopAppBar(
                 title = { Text(tr("Benchmarks")) },
+                navigationIcon = { if (onBack != null) app.grippy.measure.BackButton(onBack) },
                 actions = {
                     // The one door to both measurements. Critical force lives here, not on
                     // Today: a test every six to eight weeks is a measurement, not the ritual

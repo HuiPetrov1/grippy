@@ -17,12 +17,20 @@ changes merge cleanly.
   install the new APK. Settings has an Updates card.
 - No Google Play rating prompt and no support mail to the upstream maintainer.
 - CI runs the Android job only.
+- Frez-style tabs: **Home**, **Workout** (Get a Grip's routines), **Measure**, **History**.
+  Settings and Benchmarks open from Home.
+- A **Measure** section for any exercise, not just climbing
+  (`android/app/src/main/kotlin/app/grippy/measure/`). Pick Peak, Endurance, Critical Force
+  (24 × 7 s/3 s) or RFD, then the hands, duration and countdown. Afterwards, pick or name the
+  exercise. Exercises live in folders, and each has Summary / Measure / How to tabs, a
+  history chart per measurement type (Average / Max / Total Load, kg or % of bodyweight),
+  and a shareable result card. The data lives in its own Room database, `grippy-measure.db`,
+  so upstream's schema is untouched.
 
 ## Look
 
-Grippy has its own visual theme over Get a Grip's layouts: chalk-white and ink-black
-surfaces, a cobalt accent for actions and live force, the bundled Barlow / Barlow Semi
-Condensed typeface (OFL 1.1), and a cobalt launcher icon. The tokens live in
+Grippy follows Frez's look: near-black (or iOS-grey) surfaces with outlined cards, a
+system-blue accent, the bundled Inter typeface (OFL 1.1), and a blue launcher icon. The tokens live in
 `android/app/src/main/kotlin/run/nuri/getagrip/ui/theme/` (Tokens, Typography, Materials);
 `ContrastTests` keeps every text colour readable.
 

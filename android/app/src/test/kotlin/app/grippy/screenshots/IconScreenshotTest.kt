@@ -55,7 +55,7 @@ class IconScreenshotTest {
                 Icon(CircleShape)
                 Icon(RoundedCornerShape(36.dp))
                 // The splash: the foreground glyph on the splash colour.
-                Box(Modifier.size(120.dp).background(Color(0xFF3346EE)), contentAlignment = Alignment.Center) {
+                Box(Modifier.size(120.dp).background(Color(0xFF0A84FF)), contentAlignment = Alignment.Center) {
                     Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(120.dp))
                 }
             }

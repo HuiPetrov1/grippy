@@ -44,7 +44,8 @@ class SettingsNavigationTests {
             controller = Robolectric.buildActivity(MainActivity::class.java, intent).setup().visible()
         }
         compose.waitForIdle()
-        compose.onNodeWithText("Settings").performClick()
+        // Grippy: Settings opens from Home's gear, not a tab.
+        compose.onNodeWithContentDescription("Settings").performClick()
         compose.waitForIdle()
     }
 

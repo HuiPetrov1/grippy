@@ -61,42 +61,45 @@ data class GripPalette(
 /// them (declaration-order init). White on it measures 5.62:1.
 private val ALARM_FLAT = Color(0xFFC62828)
 
-// Grippy's palette: chalk white and ink black instead of the slate field, with one cobalt
-// accent that carries both the interactive chrome (`graphite`) and the live-force signal
-// (`bleu`). ContrastTests holds every pairing to its floor.
+// Grippy's palette: Frez-style iOS greys (near-black field, raised graphite cards) and a
+// system-blue accent. ContrastTests holds every pairing to its floor.
 val LightPalette = GripPalette(
-    inkPrimary = Color(0xFF13151B),
-    inkSecondary = Color(0xFF3D4352),
-    inkTertiary = Color(0xFF535A6C),
-    graphite = Color(0xFF3346EE),
+    inkPrimary = Color(0xFF111114),
+    inkSecondary = Color(0xFF3C3C43),
+    inkTertiary = Color(0xFF6C6C72),
+    graphite = Color(0xFF0866D1),
     graphiteInverse = Color.White,
-    bleu = Color(0xFF2F5BF5),
-    moss = Color(0xFF12804F),
-    alarm = Color(0xFFC02323),
+    bleu = Color(0xFF0A84FF),
+    moss = Color(0xFF24A148),
+    alarm = Color(0xFFD70015),
     alarmFlat = ALARM_FLAT,
-    calm = Color(0xFF55627F),
+    calm = Color(0xFF6C6C72),
     armed = Color(0xFFFF9800),
-    field = Color(0xFFF1F3F7),
+    field = Color(0xFFF2F2F7),
     card = Color(0xFFFFFFFF),
-    well = Color(0x0F13151B),
+    well = Color(0x0F000000),
 )
 
 val DarkPalette = GripPalette(
-    inkPrimary = Color(0xFFF2F4F8),
-    inkSecondary = Color(0xFFBAC0CD),
-    inkTertiary = Color(0xFF959CAD),
-    graphite = Color(0xFF93A2FF),
-    graphiteInverse = Color(0xFF0C0F1E),
-    bleu = Color(0xFF7D9BFF),
-    moss = Color(0xFF4FCF8E),
-    alarm = Color(0xFFFF7B72),
+    inkPrimary = Color(0xFFFFFFFF),
+    inkSecondary = Color(0xFF9E9DA5),
+    inkTertiary = Color(0xFF8E8D95),
+    graphite = Color(0xFF4DA3FF),
+    graphiteInverse = Color(0xFF0B0B10),
+    bleu = Color(0xFF0A84FF),
+    moss = Color(0xFF30D158),
+    alarm = Color(0xFFFF6961),
     alarmFlat = ALARM_FLAT,
-    calm = Color(0xFF9DA8C5),
+    calm = Color(0xFF8E8D95),
     armed = Color(0xFFFF9800),
-    field = Color(0xFF0D0F14),
-    card = Color(0xFF181B23),
-    well = Color(0x12F2F4F8),
+    field = Color(0xFF18171C),
+    card = Color(0xFF212126),
+    well = Color(0x14FFFFFF),
 )
+
+/// Grippy: the filled-button blue (Frez's system blue) under white labels. Labels on it are
+/// 17 sp SemiBold, so it is held to the large-text floor (3:1), not body text's 4.5:1.
+val AccentFill = Color(0xFF0A84FF)
 
 val LocalGripPalette = staticCompositionLocalOf { LightPalette }
 

@@ -127,6 +127,8 @@ private const val ROUTE_GAUGE_PICKER = "gauge-picker"
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
+    /// Grippy: Settings opens from Home's gear, so it carries a back arrow.
+    onBack: (() -> Unit)? = null,
 ) {
     val nav = rememberNavController()
     // Explicit, from the Motion ladder: Navigation Compose's default is a 700 ms cross-fade
@@ -142,6 +144,7 @@ fun SettingsScreen(
     ) {
         composable(ROUTE_SETTINGS) {
             SettingsRoot(
+                onBack = onBack,
                 onOpenGaugePicker = dropUnlessResumed {
                     nav.navigate(ROUTE_GAUGE_PICKER) { launchSingleTop = true }
                 },
@@ -160,6 +163,7 @@ fun SettingsScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SettingsRoot(
+    onBack: (() -> Unit)?,
     onOpenGaugePicker: () -> Unit,
 ) {
     val palette = LocalGripPalette.current
@@ -175,6 +179,7 @@ private fun SettingsRoot(
         topBar = {
             LargeTopAppBar(
                 title = { Text(tr("Settings")) },
+                navigationIcon = { if (onBack != null) app.grippy.measure.BackButton(onBack) },
                 scrollBehavior = scrollBehavior,
                 windowInsets = WindowInsets(0, 0, 0, 0),
                 colors = TopAppBarDefaults.topAppBarColors(

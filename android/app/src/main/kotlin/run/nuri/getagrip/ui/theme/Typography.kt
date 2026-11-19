@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 // Original contributions Copyright 2026 Nuri Bruner.
-// Grippy: Barlow replaces the system face (bundled, OFL 1.1 — see LICENSES/Barlow-OFL-1.1.txt).
+// Grippy: Inter replaces the system face (bundled, OFL 1.1 — see LICENSES/Inter-OFL-1.1.txt).
 
 package run.nuri.getagrip.ui.theme
 
@@ -12,26 +12,26 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import run.nuri.getagrip.R
 
-/// Grippy's two faces, both bundled so nothing depends on Play services or a download.
+/// Grippy's face, bundled so nothing depends on Play services or a download.
 object GripFonts {
-    /// Running text, rows and buttons: Barlow, a little technical, very legible small.
+    /// Running text, rows and buttons: Inter.
     val text = FontFamily(
-        Font(R.font.barlow_regular, FontWeight.Normal),
-        Font(R.font.barlow_medium, FontWeight.Medium),
-        Font(R.font.barlow_semibold, FontWeight.SemiBold),
-        Font(R.font.barlow_bold, FontWeight.Bold),
+        Font(R.font.inter_regular, FontWeight.Normal),
+        Font(R.font.inter_medium, FontWeight.Medium),
+        Font(R.font.inter_semibold, FontWeight.SemiBold),
+        Font(R.font.inter_bold, FontWeight.Bold),
     )
 
-    /// Headings and every big number: Barlow Semi Condensed, a scoreboard face. Lighter
-    /// weights map up to Medium so the old thin numerals become solid ones.
+    /// Headings and every big number: Inter again, but the light weights map up to SemiBold
+    /// so the old thin numerals become solid ones.
     val display = FontFamily(
-        Font(R.font.barlow_semicondensed_medium, FontWeight.Thin),
-        Font(R.font.barlow_semicondensed_medium, FontWeight.ExtraLight),
-        Font(R.font.barlow_semicondensed_medium, FontWeight.Light),
-        Font(R.font.barlow_semicondensed_medium, FontWeight.Normal),
-        Font(R.font.barlow_semicondensed_medium, FontWeight.Medium),
-        Font(R.font.barlow_semicondensed_semibold, FontWeight.SemiBold),
-        Font(R.font.barlow_semicondensed_bold, FontWeight.Bold),
+        Font(R.font.inter_semibold, FontWeight.Thin),
+        Font(R.font.inter_semibold, FontWeight.ExtraLight),
+        Font(R.font.inter_semibold, FontWeight.Light),
+        Font(R.font.inter_semibold, FontWeight.Normal),
+        Font(R.font.inter_semibold, FontWeight.Medium),
+        Font(R.font.inter_semibold, FontWeight.SemiBold),
+        Font(R.font.inter_bold, FontWeight.Bold),
     )
 }
 
@@ -41,7 +41,7 @@ private fun type(
 ) = TextStyle(fontFamily = family, fontSize = size.sp, lineHeight = leading.sp,
     fontWeight = weight, letterSpacing = tracking.sp)
 
-// The original sizes and leading (tuned for every layout's large-text fits); Barlow faces and
+// The original sizes and leading (tuned for every layout's large-text fits); the Inter face and
 // heavier display weights are Grippy's.
 val GripTypography = Typography(
     displayLarge = type(57, 60, FontWeight.SemiBold, -1.2f, GripFonts.display),

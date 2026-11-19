@@ -65,6 +65,8 @@ class RoutineOverviewNavigationTests {
         compose.waitUntil(timeoutMillis = 5_000) {
             compose.runOnIdle { application.templates.routines.any { it.id == template.id } }
         }
+        // Grippy: the app opens on Home; routines live on the Workout tab.
+        tab("Workout").performClick()
         compose.onNodeWithTag("today.routineOverview").assertIsDisplayed()
     }
 
@@ -126,13 +128,13 @@ class RoutineOverviewNavigationTests {
         tab("History").assertIsSelected()
         compose.onNodeWithTag("today.routineOverview").assertDoesNotExist()
 
-        tab("Today").performClick()
+        tab("Workout").performClick()
         compose.onNodeWithContentDescription(
             "Log a climb or hangs without the gauge",
         ).performScrollTo().performClick()
         compose.onNodeWithText("Log a session").assertIsDisplayed()
         compose.onNodeWithText("Cancel").performClick()
-        tab("Today").assertIsSelected()
+        tab("Workout").assertIsSelected()
         tab("History").assertIsNotSelected()
         compose.onNodeWithTag("today.routineOverview").assertExists()
         assertEquals(0, runBlocking { application.database.logs().all() }.size,

@@ -33,10 +33,11 @@ internal data class MineralField(
 // Grippy: a clean ground with a faint cobalt glow up top and a violet one lower right,
 // in place of the grained slate. No grain.
 internal fun mineralField(dark: Boolean) = MineralField(
-    stops = if (dark) listOf(Color(0xFF12151D), Color(0xFF0D0F14), Color(0xFF0B0D11))
-        else listOf(Color(0xFFF7F8FB), Color(0xFFF1F3F7), Color(0xFFECEFF5)),
-    light = Color(0xFF3D5BFF).copy(alpha = if (dark) .11f else .045f),
-    cloud = Color(0xFF8B5CF6).copy(alpha = if (dark) .035f else .02f),
+    // Grippy: a flat field, as Frez — no light or cloud.
+    stops = if (dark) listOf(Color(0xFF18171C), Color(0xFF18171C))
+        else listOf(Color(0xFFF2F2F7), Color(0xFFF2F2F7)),
+    light = Color.Transparent,
+    cloud = Color.Transparent,
     grainAlpha = 0f,
 )
 
@@ -97,7 +98,7 @@ fun InstrumentSurface(
     color: Color = LocalGripPalette.current.card,
     contentColor: Color = LocalGripPalette.current.inkPrimary,
     tonalElevation: Dp = 0.dp,
-    shadowElevation: Dp = 2.dp,
+    shadowElevation: Dp = 0.dp,
     border: BorderStroke? = null,
     content: @Composable () -> Unit,
 ) {
@@ -111,12 +112,6 @@ fun InstrumentSurface(
  */
 @Composable
 fun instrumentRim(palette: GripPalette): BorderStroke = remember(palette) {
-    // Grippy: a crisp hairline. In dark mode light still catches the top edge.
-    if (palette == DarkPalette) {
-        BorderStroke(1.dp, Brush.verticalGradient(
-            listOf(Color.White.copy(alpha = .10f), Color.White.copy(alpha = .03f)),
-        ))
-    } else {
-        BorderStroke(1.dp, palette.inkPrimary.copy(alpha = .07f))
-    }
+    // Grippy: Frez's crisp solid outline.
+    BorderStroke(1.dp, if (palette == DarkPalette) Color(0xFF38383F) else Color(0xFFE2E2E8))
 }

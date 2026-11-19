@@ -64,6 +64,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import run.nuri.getagrip.ui.theme.InstrumentSurface
@@ -94,6 +98,28 @@ import run.nuri.getagrip.ui.theme.LocalGripPalette
 import run.nuri.getagrip.ui.theme.rememberReduceMotion
 import run.nuri.getagrip.ui.gauge.LiveGaugeHost
 import run.nuri.getagrip.ui.today.TodayScreen
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.FitnessCenter
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Speed
+import androidx.compose.foundation.background
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import app.grippy.measure.HomeScreen
+import app.grippy.measure.MeasureNavigator
+import app.grippy.measure.MeasureRouteHost
+import app.grippy.measure.MeasureSheets
+import app.grippy.measure.MeasureTabScreen
+import app.grippy.measure.measureColors
+import app.grippy.measure.textStyle
 
 /// Three tabs on iOS became four when Maxes earned its own; the anti-Frez tab count is still
 /// "the fewest that can carry the ritual".
@@ -107,14 +133,18 @@ import run.nuri.getagrip.ui.today.TodayScreen
 /// **The label is a `get()`, not a constructor argument.** Enum entries are built once per
 /// process, so a translated string baked in would keep the old language after the phone's
 /// changes. Every enum carrying a display name resolves it on read for this reason.
-enum class Tab(private val key: String, @DrawableRes val icon: Int, @DrawableRes val selectedIcon: Int) {
-    Today("Today", R.drawable.ic_tab_today, R.drawable.ic_tab_today),
-    History("History", R.drawable.ic_tab_history, R.drawable.ic_tab_history_fill),
-    Maxes("Benchmarks", R.drawable.ic_tab_benchmarks, R.drawable.ic_tab_benchmarks_fill),
-    Settings("Settings", R.drawable.ic_tab_settings, R.drawable.ic_tab_settings_fill);
+enum class Tab(private val key: String, val icon: ImageVector, val selectedIcon: ImageVector) {
+    // Grippy: Frez's four tabs. Settings and Benchmarks open from Home.
+    Home("Home", Icons.Outlined.Home, Icons.Filled.Home),
+    Workout("Workout", Icons.Outlined.FitnessCenter, Icons.Filled.FitnessCenter),
+    Measure("Measure", Icons.Outlined.Speed, Icons.Filled.Speed),
+    History("History", Icons.Outlined.CalendarMonth, Icons.Filled.CalendarMonth);
 
     val label: String get() = L10n.tr(key)
 }
+
+/// Grippy: the pages Home pushes over the tabs.
+enum class HomePage { Settings, Benchmarks }
 
 /// The SOFT NUDGE: once the newest measured max is four weeks stale the Maxes icon pulses
 /// (Nuri, 2026-08-10). No badge, no notification; someone who never measured is never nudged.
@@ -148,7 +178,7 @@ internal const val BENCHMARK_PULSE_BEATS = 3
 
 @Composable
 fun RootTabView() {
-    var current by rememberSaveable { mutableStateOf(Tab.Today) }
+    var current by rememberSaveable { mutableStateOf(Tab.Home) }
     val tabState = rememberSaveableStateHolder()
     val palette = LocalGripPalette.current
     val templates = LocalTemplateStore.current
@@ -169,7 +199,7 @@ fun RootTabView() {
     // continues, and the inbox waits for the runner to close.
     LaunchedEffect(templates.pendingImport, templates.pendingImportError) {
         if (templates.pendingImport != null || templates.pendingImportError != null) {
-            current = Tab.Today
+            current = Tab.Workout
         }
     }
 
@@ -243,7 +273,7 @@ fun RootTabView() {
         if (BuildConfig.DEBUG && !presentation.previewedCriticalForce &&
             launchIntent?.getBooleanExtra("previewCriticalForce", false) == true) {
             presentation.previewedCriticalForce = true
-            current = Tab.Maxes
+            current = Tab.Home
             val (grip, hands) = newCriticalForceTest(templates.criticalForceRecords, templates.recentGrips)
             openCriticalForce(grip, hands)
         }
@@ -252,7 +282,7 @@ fun RootTabView() {
         if (BuildConfig.DEBUG && !presentation.previewedMaxMeasure &&
             launchIntent?.getBooleanExtra("previewMaxMeasure", false) == true) {
             presentation.previewedMaxMeasure = true
-            current = Tab.Maxes
+            current = Tab.Home
             presentation.measuring = MeasureRequest(
                 templates.recentGrips.firstOrNull() ?: GripSpec(),
                 if (launchIntent.getBooleanExtra("previewMaxBoth", false)) Side.both else Side.left,
@@ -329,69 +359,35 @@ fun RootTabView() {
     // set of rules about what settles a day.
     var loggingSession by presentation::loggingSession
 
+    // Grippy: the Measure section's routes, and Home's Settings / Benchmarks, cover the tabs.
+    val measureNav: MeasureNavigator = viewModel()
+    var homePage by rememberSaveable { mutableStateOf<HomePage?>(null) }
+    if (measureNav.top != null) {
+        Box(Modifier.fillMaxSize().background(measureColors().bg)) { MeasureRouteHost(measureNav) }
+        MeasureSheets(measureNav, onLiveData = { liveGauge = true })
+        return
+    }
+    homePage?.let { page ->
+        androidx.activity.compose.BackHandler { homePage = null }
+        Box(Modifier.fillMaxSize().background(measureColors().bg).windowInsetsPadding(WindowInsets.statusBars)) {
+            when (page) {
+                HomePage.Settings -> SettingsScreen(onBack = { homePage = null })
+                HomePage.Benchmarks -> MaxesTabScreen(
+                    onAddMax = { seed -> newMax = NewMaxDraft(seed ?: templates.recentGrips.firstOrNull() ?: GripSpec()) },
+                    onEdit = { grip -> editingMax = MaxEditRequest(grip) },
+                    onMeasure = { grip, side, seconds -> measuring = MeasureRequest(grip, side, seconds = seconds) },
+                    onCriticalForce = ::openCriticalForce,
+                    onBack = { homePage = null },
+                )
+            }
+        }
+        if (loggingSession) SessionLogSheet(onClose = { loggingSession = false })
+        return
+    }
+
     Scaffold(
         containerColor = androidx.compose.ui.graphics.Color.Transparent,
-        bottomBar = {
-            Box(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
-                contentAlignment = Alignment.Center) {
-            InstrumentSurface(shape = RoundedCornerShape(28.dp), shadowElevation = 4.dp,
-                modifier = Modifier.widthIn(max = 440.dp)) {
-            // Two native rows keep every tab name readable at accessibility text sizes.
-            // MEASURED: the switch happens when the widest label no longer fits a quarter of
-            // the bar, not at a fixed scale — at 1.5 a 1.6 threshold clipped "Benchmarks" to
-            // "Benchmar", and French or a larger display size moves the point again.
-            val tabLabelMeasurer = rememberTextMeasurer()
-            val tabLabelStyle = MaterialTheme.typography.labelMedium
-            val widestTabLabel = remember(tabLabelStyle, tabLabelMeasurer, LocalConfiguration.current) {
-                Tab.entries.maxOf { tabLabelMeasurer.measure(it.label, tabLabelStyle, maxLines = 1).size.width }
-            }
-            BoxWithConstraints {
-            // NavigationBar spaces its items TAB_ITEM_SPACING apart; a label may use its
-            // item's whole width, less a hair so it never touches the neighbour's.
-            val count = Tab.entries.size
-            val labelRoom = with(LocalDensity.current) {
-                (constraints.maxWidth - (count - 1) * TAB_ITEM_SPACING.roundToPx()) / count -
-                    TAB_LABEL_MARGIN.roundToPx()
-            }
-            val perRow = if (widestTabLabel > labelRoom || LocalDensity.current.fontScale >= 1.6f) 2 else 4
-            Column {
-            Tab.entries.chunked(perRow).forEach { tabs ->
-            NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp,
-                windowInsets = WindowInsets(0, 0, 0, 0)) {
-                // **The selection pill is GRAPHITE, not Material's lavender**: `secondaryContainer` leaks a
-                // hue the palette lacks onto always-visible chrome. A 12 % graphite wash reads as selection
-                // without spending a signal hue on navigation.
-                val itemColours = NavigationBarItemDefaults.colors(
-                    indicatorColor = palette.graphite.copy(alpha = 0.12f),
-                    selectedIconColor = palette.inkPrimary,
-                    selectedTextColor = palette.inkPrimary,
-                    unselectedIconColor = palette.inkSecondary,
-                    unselectedTextColor = palette.inkSecondary,
-                )
-                val nudge = templates.benchmarkNudge && !reduceMotion
-                tabs.forEach { tab ->
-                    NavigationBarItem(
-                        selected = current == tab,
-                        onClick = { current = tab },
-                        icon = {
-                            Icon(
-                                ImageVector.vectorResource(if (current == tab) tab.selectedIcon else tab.icon),
-                                // The LABEL already says "Maxes"; a description would be read twice.
-                                contentDescription = null,
-                                modifier = Modifier.benchmarkPulse(tab == Tab.Maxes && nudge),
-                            )
-                        },
-                        label = { Text(tab.label, maxLines = 1) },
-                        colors = itemColours,
-                    )
-                }
-            }
-            }
-            }
-            }
-            }
-            }
-        },
+        bottomBar = { GrippyTabBar(current) { current = it } },
     ) { padding ->
         // Only top/sides constrain the viewport: a bottom inset clipped scrolling cards along a
         // rectangle above the floating bar.
@@ -404,7 +400,13 @@ fun RootTabView() {
             CompositionLocalProvider(LocalFloatingTabBarInset provides padding.calculateBottomPadding()) {
             tabState.SaveableStateProvider(current) {
             when (current) {
-                Tab.Today -> TodayScreen(
+                Tab.Home -> HomeScreen(
+                    nav = measureNav,
+                    onSettings = { homePage = HomePage.Settings },
+                    onBenchmarks = { homePage = HomePage.Benchmarks },
+                    onLiveData = { liveGauge = true },
+                )
+                Tab.Workout -> TodayScreen(
                     onStart = { template, timerOnly ->
                         // Written on START: at 19:00 the question is which one you are in the middle of.
                         val started = workouts.start(template) { sessionScope ->
@@ -435,19 +437,14 @@ fun RootTabView() {
                     // guard has to be told.
                     canPresentImport = !loggingSession,
                 )
+                Tab.Measure -> MeasureTabScreen(measureNav, onLiveData = { liveGauge = true })
                 Tab.History -> HistoryScreen(onLogSession = { loggingSession = true })
-                Tab.Maxes -> MaxesTabScreen(
-                    onAddMax = { seed -> newMax = NewMaxDraft(seed ?: templates.recentGrips.firstOrNull() ?: GripSpec()) },
-                    onEdit = { grip -> editingMax = MaxEditRequest(grip) },
-                    onMeasure = { grip, side, seconds -> measuring = MeasureRequest(grip, side, seconds = seconds) },
-                    onCriticalForce = ::openCriticalForce,
-                )
-                Tab.Settings -> SettingsScreen()
             }
         }
         }
         }
     }
+    MeasureSheets(measureNav, onLiveData = { liveGauge = true })
 
     if (loggingSession) {
         SessionLogSheet(onClose = { loggingSession = false })
@@ -464,3 +461,32 @@ private val TAB_ITEM_SPACING = 8.dp
 
 /// Air a tab label keeps inside its item, so a label that "fits" is not drawn edge to edge.
 private val TAB_LABEL_MARGIN = 4.dp
+
+/// Grippy: Frez's flat tab bar — a hairline on top, outlined icons at rest, filled when chosen.
+@Composable
+private fun GrippyTabBar(current: Tab, onSelect: (Tab) -> Unit) {
+    val c = measureColors()
+    Column(Modifier.fillMaxWidth().background(if (c.dark) Color(0xFF1E1E23) else Color(0xFFFAFAFC))) {
+        Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
+        Row(Modifier.fillMaxWidth().navigationBarsPadding().height(76.dp)) {
+            Tab.entries.forEach { tab ->
+                val on = tab == current
+                Column(
+                    Modifier.weight(1f).fillMaxSize().selectable(
+                        selected = on, role = androidx.compose.ui.semantics.Role.Tab,
+                        interactionSource = remember { MutableInteractionSource() }, indication = null,
+                    ) { onSelect(tab) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                ) {
+                    Icon(if (on) tab.selectedIcon else tab.icon, contentDescription = null,
+                        tint = if (on) c.text else c.text3, modifier = Modifier.size(30.dp))
+                    Text(tab.label, maxLines = 1,
+                        style = textStyle(15.sp, if (on) FontWeight.SemiBold else FontWeight.Medium, if (on) c.text else c.text3),
+                        modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+        }
+    }
+}
+
