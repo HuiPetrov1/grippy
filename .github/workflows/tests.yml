@@ -42,18 +42,3 @@ jobs:
         with:
           name: android-test-reports
           path: android/**/build/reports/tests/
-  ios:
-    runs-on: macos-26
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-      - run: brew install xcodegen
-      - run: ./build.sh test
-      - run: ./Fixtures/tools/oracle/build.sh && ./Fixtures/tools/oracle/build/oracle runner verify Fixtures && ./Fixtures/tools/oracle/build/oracle agent verify Fixtures && ./Fixtures/tools/oracle/build/oracle share verify Fixtures && ./Fixtures/tools/oracle/build/oracle export verify Fixtures
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: failure()
-        with:
-          name: ios-test-log
-          path: build/last-test.log

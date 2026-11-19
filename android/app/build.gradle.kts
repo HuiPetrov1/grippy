@@ -56,7 +56,8 @@ android {
     defaultConfig {
         // FROZEN. The application id is the app's identity on Google Play and on every
         // phone it is installed on; renaming it after the first upload is a new app.
-        applicationId = "run.nuri.getagrip"
+        // Grippy (fork): its own identity, so it never collides with an installed Get a Grip.
+        applicationId = "app.grippy"
         minSdk = 31
         targetSdk = 36
         // **THE VERSION LIVES IN `gradle.properties`,** not here: an upload to Play is

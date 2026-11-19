@@ -69,6 +69,10 @@
     <!-- Not required: the app runs a whole session on the clock alone when there is no
          gauge (flat battery, gauge left at home), so a phone without BLE is still a phone
          this app works on. -->
+    <!-- Grippy: the built-in updater installs new builds from github.com/HuiPetrov1/grippy-releases. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
+
     <uses-feature
         android:name="android.hardware.bluetooth_le"
         android:required="false" />
@@ -156,6 +160,11 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!-- Grippy: receives the system's result for a self-update install. -->
+        <receiver
+            android:name="app.grippy.update.InstallResultReceiver"
+            android:exported="false" />
 
         <!-- The background grace's backstop: an inexact alarm that drops an idle gauge's link
              even when the app was frozen through the 45 s window and its own timer never

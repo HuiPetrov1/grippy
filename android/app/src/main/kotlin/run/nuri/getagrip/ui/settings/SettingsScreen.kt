@@ -4,6 +4,7 @@
 package run.nuri.getagrip.ui.settings
 
 import run.nuri.getagrip.store.diagnosticTimeline
+import app.grippy.update.rememberUpdateStatus
 import run.nuri.getagrip.ui.units.WeightUnit
 import run.nuri.getagrip.ui.components.Chip
 
@@ -231,16 +232,8 @@ private fun SettingsRoot(
 
             // The live gauge is a button on Today's bar (2026-09-20): one door, not two.
 
-            SupportCard(
-                // No demo suffix: there is no user-facing demo mode any more (2026-10-31), and the
-                // debug-only mock never reaches a release build's support mail.
-                gauge = device.gaugeKind.displayName,
-                diagnostics = {
-                    if (device.diagnosticEntries.isEmpty()) null
-                    else device.diagnosticEntries.diagnosticTimeline() +
-                        "\n\n" + device.pipelineDiagnostics.report()
-                },
-            )
+            // Grippy: support mail went to Get a Grip's maintainer; this fork has its own updater instead.
+            UpdatesCard()
             LegalCard()
             OpenSourceCommunityCard()
             AboutCard()
@@ -492,11 +485,16 @@ private fun OpenSourceCommunityCard() {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 CommunityLink(
                     title = tr("Source code"),
-                    url = "https://github.com/plumbmybumb/get-a-grip",
+                    url = "https://github.com/HuiPetrov1/grippy",
                 )
                 CommunityLink(
                     title = tr("Open-source licenses"),
-                    url = "https://github.com/plumbmybumb/get-a-grip/blob/main/THIRD_PARTY_NOTICES.txt",
+                    url = "https://github.com/HuiPetrov1/grippy/blob/main/THIRD_PARTY_NOTICES.txt",
+                )
+                CommunityLink(
+                    title = "Get a Grip",
+                    description = "Grippy is a personal fork of Get a Grip by Nuri Bruner (MPL 2.0). It is not the official app.",
+                    url = "https://github.com/plumbmybumb/get-a-grip",
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(vertical = 4.dp),
@@ -582,7 +580,7 @@ private fun AboutCard() {
     Card {
         CapsLabel(tr("About"))
         Spacer(Modifier.size(4.dp))
-        LabelledValue(tr("App"), "Get a Grip")
+        LabelledValue(tr("App"), "Grippy")
         LabelledValue(tr("Version"), version)
         androidx.compose.material3.TextButton(onClick = {
             val report = device.diagnosticEntries.diagnosticTimeline() +
@@ -614,6 +612,27 @@ private fun AboutCard() {
             style = MaterialTheme.typography.bodySmall,
             color = palette.inkSecondary,
         )
+    }
+}
+
+// MARK: - Grippy updates
+
+/// Grippy's self-updater: which build is installed and whether a newer one is in the releases repo.
+@Composable
+private fun UpdatesCard() {
+    val palette = LocalGripPalette.current
+    val (status, action) = rememberUpdateStatus()
+    Card {
+        CapsLabel("Updates")
+        Spacer(Modifier.size(4.dp))
+        LabelledValue("Status", status)
+        action?.let { (label, onClick) ->
+            androidx.compose.material3.TextButton(
+                onClick = onClick,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(end = 12.dp, top = 8.dp, bottom = 8.dp),
+            ) { Text(label, Modifier.fillMaxWidth(), color = palette.bleu) }
+        }
     }
 }
 

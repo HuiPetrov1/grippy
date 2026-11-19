@@ -35,7 +35,7 @@ if [[ -z "$SDK_DIR" && -f local.properties ]]; then
   SDK_DIR="$(sed -n 's/^sdk.dir=//p' local.properties)"
 fi
 ADB="${SDK_DIR:-$HOME/Library/Android/sdk}/platform-tools/adb"
-APP_ID="run.nuri.getagrip"
+APP_ID="app.grippy"
 
 case "${1:-test}" in
   test)    ./gradlew test ;;

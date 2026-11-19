@@ -53,7 +53,9 @@ fun rememberReviewRequest(runnerOpen: Boolean): ReviewRequestState {
         }
         if (saved <= baseline) return@LaunchedEffect
         baseline = saved
-        if (!ReviewRequestPolicy.shouldAsk(templates.hangSessionCount(), settings.reviewRequested)) {
+        // Grippy: there is no Play listing to rate, so the ask is never shown.
+        if (GRIPPY_HAS_NO_PLAY_LISTING ||
+            !ReviewRequestPolicy.shouldAsk(templates.hangSessionCount(), settings.reviewRequested)) {
             return@LaunchedEffect
         }
         settings.setReviewRequested(true)
@@ -65,6 +67,9 @@ fun rememberReviewRequest(runnerOpen: Boolean): ReviewRequestState {
 
 /// A second after the runner closes: the screen has settled, and the finish is still fresh.
 internal const val REVIEW_PROMPT_DELAY_MILLIS = 1_000L
+
+/// Grippy is sideloaded from its own releases repo, not Google Play.
+private const val GRIPPY_HAS_NO_PLAY_LISTING = true
 
 /// The ask itself. It says WHY — free, open source, a rating helps other climbers find it —
 /// the line Settings' permanent row carries too, and it only opens the Play listing: the

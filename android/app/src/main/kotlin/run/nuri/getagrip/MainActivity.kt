@@ -10,6 +10,9 @@ import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import app.grippy.update.UpdateBanner
+import app.grippy.update.UpdateManager
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.CompositionLocalProvider
@@ -158,7 +161,13 @@ class MainActivity : ComponentActivity() {
                             run.nuri.getagrip.ui.history.SessionLogSheet { preview.value = false }
                         }
                     } else {
-                        RootTabView()
+                        // Grippy: the self-update banner floats over the app.
+                        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+                            RootTabView()
+                            UpdateBanner(
+                                androidx.compose.ui.Modifier.align(androidx.compose.ui.Alignment.TopCenter),
+                            )
+                        }
                     }
                 }
             }
@@ -205,6 +214,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         clock.refresh()
         lifecycleScope.launch { templates.refreshIfDayChanged() }
+        // Grippy: look for a new build in the releases repo (throttled to every 5 minutes).
+        UpdateManager.check(this)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

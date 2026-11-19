@@ -31,7 +31,7 @@
     <string name="a_stored_on_this_device_only_nothing_syncs_between_devices">Enregistré sur cet appareil seulement. Rien ne se synchronise entre appareils.</string>
     <string name="a_this_routine_asks_for_d_a_day">Cette routine en demande %d par jour.</string>
     <string name="a_couldn_t_open_the_camera_open_the_routine_link_instead">Impossible d’ouvrir la caméra. Ouvre plutôt le lien de la routine.</string>
-    <string name="a_point_your_camera_at_a_get_a_grip_routine_qr_code">Vise le QR code d’une routine Get a Grip avec ta caméra.</string>
+    <string name="a_point_your_camera_at_a_get_a_grip_routine_qr_code">Vise le QR code d’une routine Grippy avec ta caméra.</string>
     <string name="a_recent_connection_events_are_added_to_your_email_you_can">Les événements de connexion récents sont ajoutés à ton e-mail. Tu peux les vérifier avant l’envoi.</string>
     <string name="a_no_email_app_available">Aucune application de messagerie disponible</string>
     <string name="a_copy_your_draft_and_email_it_to_this_address">Copie ton brouillon et envoie-le à cette adresse.</string>
@@ -39,15 +39,15 @@
     <string name="a_privacy_and_terms">Confidentialité et conditions</string>
     <string name="a_terms_of_use">Conditions d’utilisation</string>
     <string name="a_open_in_a_browser">Ouvrir dans un navigateur</string>
-    <string name="a_get_a_grip_is_not_a_medical_device_and_does_not_diagnose">Get a Grip n’est pas un dispositif médical et ne diagnostique, ne traite, ne guérit ni ne prévient aucune affection. Consultez un professionnel de santé pour un avis médical.</string>
-    <string name="a_open_get_a_grip_to_save_it">Ouvre Get a Grip pour l\'enregistrer.</string>
+    <string name="a_get_a_grip_is_not_a_medical_device_and_does_not_diagnose">Grippy n’est pas un dispositif médical et ne diagnostique, ne traite, ne guérit ni ne prévient aucune affection. Consultez un professionnel de santé pour un avis médical.</string>
+    <string name="a_open_get_a_grip_to_save_it">Ouvre Grippy pour l\'enregistrer.</string>
     <string name="a_the_app_closed_before_this_session_was_saved">L\'app s\'est fermée avant l\'enregistrement de cette séance.</string>
     <string name="a_pull_options">Options du tirage</string>
     <string name="a_critical_force_kilograms_a5fa99">Force critique %s kilogrammes</string>
     <string name="a_the_test_keeps_running_while_the_gauge_is_connected">Le test continue tant que le capteur est connecté.</string>
     <string name="a_critical_force_kilograms_ffb6e1">%1$s, force critique %2$s kilogrammes</string>
     <string name="a_rate_on_google_play">Noter sur Google Play</string>
-    <string name="a_rate_get_a_grip">Noter Get a Grip</string>
+    <string name="a_rate_get_a_grip">Noter Grippy</string>
     <string name="a_lost_the_gauge">Capteur perdu</string>
     <string name="a_reminder_time">Heure du rappel</string>
     <string name="a_start_next_session">Lancer la séance suivante</string>

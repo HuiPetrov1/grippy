@@ -71,6 +71,7 @@ class SupportTests {
         }
     }
 
+    @org.junit.Ignore("Grippy: the support card (mail to Get a Grip's maintainer) is removed from Settings")
     @Test fun bothSettingsActionsOpenTheCorrectDraftWithoutSending() {
         val intents = mutableListOf<Intent>()
         val capturing = object : ContextWrapper(context) {
@@ -87,6 +88,7 @@ class SupportTests {
             intents.map { MailTo.parse(it.dataString).subject })
     }
 
+    @org.junit.Ignore("Grippy: the support card (mail to Get a Grip's maintainer) is removed from Settings")
     @Test fun noEmailAppOffersACopyableDraft() {
         val unavailable = object : ContextWrapper(context) {
             override fun startActivity(intent: Intent) { throw ActivityNotFoundException() }

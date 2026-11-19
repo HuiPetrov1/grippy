@@ -175,6 +175,7 @@ class ReviewRequestTests {
         assertFalse(PlayStoreListing.open(nothing))
     }
 
+    @org.junit.Ignore("Grippy: no Google Play listing, so the rating prompt and row are removed")
     @Test fun theSettingsRowOpensThePlayListing() {
         val intents = mutableListOf<Intent>()
         val capturing = object : ContextWrapper(context) {
@@ -194,6 +195,7 @@ class ReviewRequestTests {
 
     /// The whole ask, driven the way the root drives it: a runner opens and closes around each
     /// save. A discarded session never asks; the fifth save does, once; the sixth does not.
+    @org.junit.Ignore("Grippy: no Google Play listing, so the rating prompt and row are removed")
     @Test fun thePromptAppearsOnceAfterTheFifthSavedRunnerSession() {
         val templates = store()
         val settings = SettingsStore(context, owner)
