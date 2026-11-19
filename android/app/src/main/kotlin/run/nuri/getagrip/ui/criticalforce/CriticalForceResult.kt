@@ -173,7 +173,7 @@ fun CriticalForceHeadline(summary: CriticalForceSummary, modifier: Modifier = Mo
                     color = palette.inkPrimary,
                     maxLines = 1,
                 )
-                Text(WeightUnits.symbol, style = TextStyle(fontSize = UNIT_SIZE), color = palette.inkTertiary,
+                Text(WeightUnits.symbol, style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = UNIT_SIZE), color = palette.inkTertiary,
                     modifier = Modifier.padding(bottom = 10.dp))
             }
             if (ratios != null) {
@@ -241,13 +241,13 @@ fun CriticalForceHandColumn(
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             BasicText(
                 WeightUnits.number(summary.criticalForceKg),
-                style = TextStyle(fontSize = 52.sp, fontWeight = FontWeight.Thin, fontFeatureSettings = "tnum",
+                style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = 52.sp, fontWeight = FontWeight.Thin, fontFeatureSettings = "tnum",
                     letterSpacing = (-0.02).em, color = palette.inkPrimary),
                 maxLines = 1,
                 autoSize = TextAutoSize.StepBased(minFontSize = 26.sp, maxFontSize = 52.sp),
                 modifier = Modifier.weight(1f, fill = false),
             )
-            Text(WeightUnits.symbol, style = TextStyle(fontSize = 18.sp), color = palette.inkTertiary,
+            Text(WeightUnits.symbol, style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = 18.sp), color = palette.inkTertiary,
                 modifier = Modifier.padding(bottom = 7.dp))
         }
         Text(summary.percentOfMax?.let { L10n.tr("%d %% of max", roundedPercent(it)) } ?: " ",

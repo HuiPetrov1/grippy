@@ -62,6 +62,8 @@ object UpdateManager {
 
     /** Throttled to once every 5 minutes unless [force]. */
     fun check(context: Context, force: Boolean = false) {
+        // JVM tests and screenshots (Robolectric) never reach out to GitHub.
+        if (Build.FINGERPRINT == "robolectric") return
         val current = _state.value
         if (current is UpdateState.Downloading || current is UpdateState.Installing) return
         val last = lastCheck

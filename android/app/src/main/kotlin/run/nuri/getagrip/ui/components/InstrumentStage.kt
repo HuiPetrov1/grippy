@@ -283,7 +283,7 @@ enum class DockTint {
     bleu, alarm, graphite;
 
     fun well(): Color = when (this) {
-        bleu -> Color(0xFF318CE7)
+        bleu -> Color(0xFF3D5BFF) // Grippy cobalt
         alarm -> Color(0xFFC62828)
         graphite -> Color(0xFF2B3038)
     }
@@ -291,7 +291,7 @@ enum class DockTint {
     fun ink(palette: GripPalette): Color {
         val dark = palette == DarkPalette
         return when (this) {
-            bleu -> if (dark) Color(0xFF9FCEFA) else Color(0xFF10508F)
+            bleu -> if (dark) Color(0xFFB7C4FF) else Color(0xFF1C2FB8)
             alarm -> if (dark) Color(0xFFFFA79E) else Color(0xFF8E1B1B)
             graphite -> if (dark) Color(0xFFEDF1F6) else Color(0xFF23272E)
         }

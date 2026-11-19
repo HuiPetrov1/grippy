@@ -139,6 +139,15 @@ android {
                 // `:engine`'s fixtures hit.
                 it.systemProperty("getagrip.res", projectDir.resolve("src/main/res").canonicalPath)
                 it.inputs.dir(projectDir.resolve("src/main/res"))
+                // Grippy: the screenshot tests (app/grippy/screenshots) only run when asked for,
+                // via scripts/grippy-screenshots.sh (-Pgrippy.screenshots).
+                if (providers.gradleProperty("grippy.screenshots").isPresent) {
+                    it.systemProperty("roborazzi.test.record", "true")
+                    it.systemProperty("grippy.screenshots.dir", layout.buildDirectory.dir("outputs/roborazzi").get().asFile.absolutePath)
+                    it.outputs.upToDateWhen { false }
+                } else {
+                    it.exclude("app/grippy/screenshots/**")
+                }
             }
         }
     }
@@ -184,6 +193,9 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     testImplementation("androidx.compose.ui:ui-test-junit4")
+    // Grippy: renders screens to PNGs for design work (scripts/grippy-screenshots.sh).
+    testImplementation("io.github.takahirom.roborazzi:roborazzi:1.77.0")
+    testImplementation("io.github.takahirom.roborazzi:roborazzi-compose:1.77.0")
 
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.runtime.compose)

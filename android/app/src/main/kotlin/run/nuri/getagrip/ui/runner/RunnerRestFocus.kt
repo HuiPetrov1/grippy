@@ -219,7 +219,7 @@ internal fun AmbientRestCountdown(snapshot: RunnerSnapshot, modifier: Modifier =
         BasicText(
             "${snapshot.secondsShown}",
             maxLines = 1,
-            style = TextStyle(fontSize = AMBIENT_SIZE, fontWeight = FontWeight.Thin,
+            style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = AMBIENT_SIZE, fontWeight = FontWeight.Thin,
                 color = palette.inkSecondary.copy(alpha = 0.75f), fontFeatureSettings = "tnum",
                 letterSpacing = (-0.02).em, textAlign = TextAlign.Center),
             autoSize = TextAutoSize.StepBased(minFontSize = 40.sp, maxFontSize = AMBIENT_SIZE),

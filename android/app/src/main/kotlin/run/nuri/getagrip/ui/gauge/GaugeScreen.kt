@@ -311,7 +311,7 @@ private fun GaugeHero() {
             BasicText(
                 // Display precision only — see `kgText`.
                 kgText(device.currentKg),
-                style = TextStyle(
+                style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, 
                     fontSize = HERO_SIZE,
                     fontWeight = FontWeight.Thin,
                     // Tabular figures so digits do not jitter sideways; −2 % display tracking because
@@ -329,7 +329,7 @@ private fun GaugeHero() {
             )
             Text(
                 WeightUnits.symbol,
-                style = TextStyle(fontSize = UNIT_SIZE),
+                style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = UNIT_SIZE),
                 color = palette.inkTertiary,
                 modifier = Modifier.padding(bottom = 12.dp),
             )

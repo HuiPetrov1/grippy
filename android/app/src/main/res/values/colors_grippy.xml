@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Grippy: the splash shows the white launcher glyph on the cobalt of the app icon. -->
+    <color name="grippy_splash">#FF3346EE</color>
+</resources>

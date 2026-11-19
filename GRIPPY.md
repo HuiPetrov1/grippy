@@ -18,6 +18,23 @@ changes merge cleanly.
 - No Google Play rating prompt and no support mail to the upstream maintainer.
 - CI runs the Android job only.
 
+## Look
+
+Grippy has its own visual theme over Get a Grip's layouts: chalk-white and ink-black
+surfaces, a cobalt accent for actions and live force, the bundled Barlow / Barlow Semi
+Condensed typeface (OFL 1.1), and a cobalt launcher icon. The tokens live in
+`android/app/src/main/kotlin/run/nuri/getagrip/ui/theme/` (Tokens, Typography, Materials);
+`ContrastTests` keeps every text colour readable.
+
+To see every screen without a phone (light and dark, with demo data):
+
+```sh
+scripts/grippy-screenshots.sh            # all screens
+scripts/grippy-screenshots.sh workout    # just one
+```
+
+PNGs land in `android/app/build/outputs/roborazzi/`.
+
 ## Release a new build
 
 ```sh

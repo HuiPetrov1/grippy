@@ -30,12 +30,14 @@ import kotlin.random.Random
 internal data class MineralField(
     val stops: List<Color>, val light: Color, val cloud: Color, val grainAlpha: Float,
 )
+// Grippy: a clean ground with a faint cobalt glow up top and a violet one lower right,
+// in place of the grained slate. No grain.
 internal fun mineralField(dark: Boolean) = MineralField(
-    stops = if (dark) listOf(Color(0xFF24292F), Color(0xFF22272E), Color(0xFF1D222A))
-        else listOf(Color(0xFFE8EBEF), Color(0xFFE2E6EB), Color(0xFFDDE1E7)),
-    light = Color.White.copy(alpha = if (dark) .015f else .18f),
-    cloud = Color(0xFF6A7B94).copy(alpha = .025f),
-    grainAlpha = .035f,
+    stops = if (dark) listOf(Color(0xFF12151D), Color(0xFF0D0F14), Color(0xFF0B0D11))
+        else listOf(Color(0xFFF7F8FB), Color(0xFFF1F3F7), Color(0xFFECEFF5)),
+    light = Color(0xFF3D5BFF).copy(alpha = if (dark) .11f else .045f),
+    cloud = Color(0xFF8B5CF6).copy(alpha = if (dark) .035f else .02f),
+    grainAlpha = 0f,
 )
 
 /** One static mineral field for the entire app. No clocks, runtime blur or per-frame noise.
@@ -67,7 +69,7 @@ fun MineralBackground(content: @Composable () -> Unit) {
                 drawRect(field)
                 drawRect(light)
                 drawRect(cloud)
-                drawRect(tooth, alpha = material.grainAlpha)
+                if (material.grainAlpha > 0f) drawRect(tooth, alpha = material.grainAlpha)
             }
         })
         content()
@@ -95,7 +97,7 @@ fun InstrumentSurface(
     color: Color = LocalGripPalette.current.card,
     contentColor: Color = LocalGripPalette.current.inkPrimary,
     tonalElevation: Dp = 0.dp,
-    shadowElevation: Dp = 1.dp,
+    shadowElevation: Dp = 2.dp,
     border: BorderStroke? = null,
     content: @Composable () -> Unit,
 ) {
@@ -109,8 +111,12 @@ fun InstrumentSurface(
  */
 @Composable
 fun instrumentRim(palette: GripPalette): BorderStroke = remember(palette) {
-    BorderStroke(.75.dp, Brush.verticalGradient(
-        listOf(Color.White.copy(alpha = if (palette == DarkPalette) .14f else .8f),
-            palette.inkPrimary.copy(alpha = .06f)),
-    ))
+    // Grippy: a crisp hairline. In dark mode light still catches the top edge.
+    if (palette == DarkPalette) {
+        BorderStroke(1.dp, Brush.verticalGradient(
+            listOf(Color.White.copy(alpha = .10f), Color.White.copy(alpha = .03f)),
+        ))
+    } else {
+        BorderStroke(1.dp, palette.inkPrimary.copy(alpha = .07f))
+    }
 }

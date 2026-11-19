@@ -617,7 +617,7 @@ private val HERO_SIZE = 76.sp
 private val UNIT_SIZE = 22.sp
 private val heroAutoSize = TextAutoSize.StepBased(minFontSize = 40.sp, maxFontSize = HERO_SIZE)
 
-private fun heroStyle(tint: Color) = TextStyle(
+private fun heroStyle(tint: Color) = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, 
     fontSize = HERO_SIZE,
     fontWeight = FontWeight.Thin,
     fontFeatureSettings = "tnum",
@@ -689,7 +689,7 @@ private fun Panel(request: CriticalForceTestRequest, tint: Color) {
                     horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
                     BasicText(clock, style = heroStyle(palette.inkPrimary), maxLines = 1, autoSize = heroAutoSize,
                         modifier = Modifier.weight(1f, fill = false))
-                    Text(tr("s"), style = TextStyle(fontSize = UNIT_SIZE), color = palette.inkTertiary,
+                    Text(tr("s"), style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = UNIT_SIZE), color = palette.inkTertiary,
                         modifier = Modifier.padding(bottom = 10.dp))
                 }
             }
@@ -709,7 +709,7 @@ private fun LiveForce(tint: Color, modifier: Modifier) {
         horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
         BasicText(WeightUnits.number(device.currentKg), style = heroStyle(tint), maxLines = 1,
             autoSize = heroAutoSize, modifier = Modifier.weight(1f, fill = false))
-        Text(WeightUnits.symbol, style = TextStyle(fontSize = UNIT_SIZE), color = palette.inkTertiary,
+        Text(WeightUnits.symbol, style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = UNIT_SIZE), color = palette.inkTertiary,
             modifier = Modifier.padding(bottom = 10.dp))
     }
 }

@@ -672,7 +672,7 @@ private fun ForceReadoutText(value: String, tint: Color, palette: GripPalette, m
             autoSize = heroAutoSize,
             modifier = Modifier.weight(1f, fill = false),
         )
-        Text(WeightUnits.symbol, style = TextStyle(fontSize = UNIT_SIZE), color = palette.inkTertiary, modifier = Modifier.padding(bottom = 10.dp))
+        Text(WeightUnits.symbol, style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = UNIT_SIZE), color = palette.inkTertiary, modifier = Modifier.padding(bottom = 10.dp))
     }
 }
 
@@ -698,14 +698,14 @@ private fun CountdownNumeral(
             autoSize = heroAutoSize,
             modifier = Modifier.weight(1f, fill = false),
         )
-        Text(tr("s"), style = TextStyle(fontSize = UNIT_SIZE), color = palette.inkTertiary,
+        Text(tr("s"), style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = UNIT_SIZE), color = palette.inkTertiary,
             modifier = Modifier.padding(bottom = 10.dp))
     }
 }
 
 /// Tabular figures so a digit change does not shove the number sideways, and display
 /// tracking at −2 % because letterforms read further apart as they grow.
-private fun heroStyle(tint: Color) = TextStyle(
+private fun heroStyle(tint: Color) = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, 
     fontSize = HERO_SIZE,
     fontWeight = FontWeight.Thin,
     fontFeatureSettings = "tnum",
@@ -1054,14 +1054,14 @@ private fun PositionFigure(
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 "$value",
-                style = TextStyle(fontSize = FIGURE_SIZE, fontWeight = FontWeight.SemiBold,
+                style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = FIGURE_SIZE, fontWeight = FontWeight.SemiBold,
                     fontFeatureSettings = "tnum", letterSpacing = (-0.02).em),
                 color = palette.inkPrimary,
                 maxLines = 1,
             )
             Text(
                 "/ $total",
-                style = TextStyle(fontSize = FIGURE_SIZE * 0.5f, fontWeight = FontWeight.Medium,
+                style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = FIGURE_SIZE * 0.5f, fontWeight = FontWeight.Medium,
                     fontFeatureSettings = "tnum"),
                 color = palette.inkSecondary,
                 maxLines = 1,

@@ -505,7 +505,7 @@ private fun MaxLiveHero(session: LiveMaxSession) {
         Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             BasicText(
                 shown?.let { WeightUnits.number(it) } ?: "—",
-                style = TextStyle(
+                style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, 
                     fontSize = HERO_SIZE,
                     fontWeight = FontWeight.Thin,
                     fontFeatureSettings = "tnum",
@@ -517,7 +517,7 @@ private fun MaxLiveHero(session: LiveMaxSession) {
                 autoSize = TextAutoSize.StepBased(minFontSize = 40.sp, maxFontSize = HERO_SIZE),
                 modifier = Modifier.weight(1f, fill = false),
             )
-            Text(WeightUnits.symbol, style = TextStyle(fontSize = HERO_UNIT_SIZE), color = palette.inkTertiary,
+            Text(WeightUnits.symbol, style = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.display, fontSize = HERO_UNIT_SIZE), color = palette.inkTertiary,
                 modifier = Modifier.padding(bottom = 12.dp))
         }
         MaxLiveReadout()

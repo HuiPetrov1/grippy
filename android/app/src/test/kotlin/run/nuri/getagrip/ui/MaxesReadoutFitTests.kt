@@ -86,7 +86,9 @@ class MaxesReadoutFitTests {
         compose.waitForIdle()
     }
 
-    private fun height(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot.height
+    // Grippy: the column's own layout height. `boundsInRoot` is clipped by the screen edge, so a
+    // reference card pushed partly below the fold measured short without anything wrapping.
+    private fun height(tag: String) = compose.onNodeWithTag(tag).fetchSemanticsNode().size.height.toFloat()
 
     private fun check(fontScale: Float, name: String, open: Boolean = false) {
         show(fontScale)

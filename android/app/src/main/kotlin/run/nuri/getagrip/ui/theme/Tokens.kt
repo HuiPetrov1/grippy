@@ -61,38 +61,41 @@ data class GripPalette(
 /// them (declaration-order init). White on it measures 5.62:1.
 private val ALARM_FLAT = Color(0xFFC62828)
 
+// Grippy's palette: chalk white and ink black instead of the slate field, with one cobalt
+// accent that carries both the interactive chrome (`graphite`) and the live-force signal
+// (`bleu`). ContrastTests holds every pairing to its floor.
 val LightPalette = GripPalette(
-    inkPrimary = Color(0xFF2E2E2E),
-    inkSecondary = Color(0xFF4D4D4D),
-    inkTertiary = Color(0xFF5B5B5B),
-    graphite = Color(0xFF2B3038),
+    inkPrimary = Color(0xFF13151B),
+    inkSecondary = Color(0xFF3D4352),
+    inkTertiary = Color(0xFF535A6C),
+    graphite = Color(0xFF3346EE),
     graphiteInverse = Color.White,
-    bleu = Color(0xFF1E6FC4),
-    moss = Color(0xFF1F7A4A),
-    alarm = Color(0xFFB42020),
+    bleu = Color(0xFF2F5BF5),
+    moss = Color(0xFF12804F),
+    alarm = Color(0xFFC02323),
     alarmFlat = ALARM_FLAT,
-    calm = Color(0xFF5F7086),
+    calm = Color(0xFF55627F),
     armed = Color(0xFFFF9800),
-    field = Color(0xFFDDE1E7),
-    card = Color(0xFFF0F2F6),
-    well = Color(0x0D2E2E2E),
+    field = Color(0xFFF1F3F7),
+    card = Color(0xFFFFFFFF),
+    well = Color(0x0F13151B),
 )
 
 val DarkPalette = GripPalette(
-    inkPrimary = Color(0xFFEDEDED),
-    inkSecondary = Color(0xFFBDBDBD),
-    inkTertiary = Color(0xFFA0A0A0),
-    graphite = Color(0xFFE7EBF1),
-    graphiteInverse = Color(0xFF1B1F25),
-    bleu = Color(0xFF5AA9F0),
-    moss = Color(0xFF58BE8B),
-    alarm = Color(0xFFF3786F),
+    inkPrimary = Color(0xFFF2F4F8),
+    inkSecondary = Color(0xFFBAC0CD),
+    inkTertiary = Color(0xFF959CAD),
+    graphite = Color(0xFF93A2FF),
+    graphiteInverse = Color(0xFF0C0F1E),
+    bleu = Color(0xFF7D9BFF),
+    moss = Color(0xFF4FCF8E),
+    alarm = Color(0xFFFF7B72),
     alarmFlat = ALARM_FLAT,
-    calm = Color(0xFF9FAEC2),
+    calm = Color(0xFF9DA8C5),
     armed = Color(0xFFFF9800),
-    field = Color(0xFF24292F),
-    card = Color(0xFF2F353D),
-    well = Color(0x0DEDEDED),
+    field = Color(0xFF0D0F14),
+    card = Color(0xFF181B23),
+    well = Color(0x12F2F4F8),
 )
 
 val LocalGripPalette = staticCompositionLocalOf { LightPalette }
@@ -105,7 +108,7 @@ val GripPalette.armedText: Color
 /// House metrics (points → dp, one to one).
 object Metrics {
     val radiusSheet = 32.dp
-    val radiusCard = 22.dp
+    val radiusCard = 24.dp
     val radiusInner = 16.dp
     val spacing = 22.dp
     val hPadding = 20.dp
