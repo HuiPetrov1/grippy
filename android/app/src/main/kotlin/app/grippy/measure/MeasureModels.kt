@@ -17,16 +17,22 @@ const val CF_WORK_SECONDS = 7
 const val CF_REST_SECONDS = 3
 const val CF_TOTAL_SECONDS = CF_REPS * (CF_WORK_SECONDS + CF_REST_SECONDS)
 
+/** Peak: one pull, the most force in it. It starts above the trigger and ends on letting go. */
+const val PEAK_MAX_SECONDS = 15
+const val PEAK_TRIGGER_KG = 1.5
+const val PEAK_RELEASE_FRACTION = 0.25
+const val PEAK_RELEASE_SECONDS = 0.3
+
 /** How a measurement is taken and what its headline number means. */
 enum class MeasureType(
     val key: String,
     val label: String,
     val blurb: String,
     val dot: Color,
-    /** Seconds the Duration field starts at; 0 = fixed protocol. */
+    /** Seconds the Duration field starts at; 0 = no Duration field (a fixed protocol, or Peak). */
     val defaultSeconds: Int,
 ) {
-    Peak("peak", "Peak", "Maximum isometric force.", Color(0xFF0A84FF), 5),
+    Peak("peak", "Peak", "Maximum isometric force.", Color(0xFF0A84FF), 0),
     Endurance("endurance", "Endurance", "How long you can hold force", Color(0xFFFCC33E), 10),
     CriticalForce("cf", "Critical Force", "Sustainable force over repeated efforts", Color(0xFFBF5AF2), 0),
     Rfd("rfd", "RFD", "Measure how quickly you can generate force.", Color(0xFF3FC8E4), 3);

@@ -99,13 +99,13 @@ fun ResultScreen(nav: MeasureNavigator, route: MeasureRoute.Result) {
             }, enabled = session.isNotEmpty()) { Icon(Icons.Outlined.Share, "Share", tint = c.text) }
             IconButton(onClick = { deleting = true }, enabled = session.isNotEmpty()) { Icon(Icons.Outlined.Delete, "Delete", tint = c.text) }
         })
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
             session.forEach { m ->
                 ScaledCard(layers.getValue(m.id)) { ResultCard(m, exercise?.name ?: "") }
             }
             if (session.isEmpty()) EmptyNote("This result was deleted.")
-            Spacer(Modifier.navigationBarsPadding().height(12.dp))
+            Spacer(Modifier.navigationBarsPadding().height(10.dp))
         }
     }
     if (deleting) {

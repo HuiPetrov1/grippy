@@ -48,20 +48,20 @@ fun HomeScreen(
     val data = rememberMeasureStore().collect()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         PageTitle("Home") {
-            IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, "Settings", tint = c.text, modifier = Modifier.size(28.dp)) }
+            IconButton(onClick = onSettings) { Icon(Icons.Outlined.Settings, "Settings", tint = c.text, modifier = Modifier.size(23.dp)) }
         }
-        Column(Modifier.padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
             // The scale. Tapping the card opens Settings, where the gauge is chosen.
-            OutlinedCard(radius = 28.dp, onClick = onSettings) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    BoxedIcon(Icons.Outlined.Bluetooth, if (device.state.isConnected) c.blue else c.text2, c.raised, 52.dp)
-                    Spacer(Modifier.width(14.dp))
+            OutlinedCard(radius = 23.dp, onClick = onSettings) {
+                Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+                    BoxedIcon(Icons.Outlined.Bluetooth, if (device.state.isConnected) c.blue else c.text2, c.raised, 43.dp)
+                    Spacer(Modifier.width(11.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(device.deviceName ?: device.gaugeKind.displayName, style = textStyle(18.sp, FontWeight.SemiBold, c.text),
+                        Text(device.deviceName ?: device.gaugeKind.displayName, style = textStyle(15.sp, FontWeight.SemiBold, c.text),
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(Modifier.height(4.dp))
                         val battery = device.batteryFraction?.let { " · ${(it * 100).roundToInt()} %" } ?: ""
-                        Text(device.state.label + battery, style = textStyle(15.sp, FontWeight.Normal, c.text2))
+                        Text(device.state.label + battery, style = textStyle(13.5.sp, FontWeight.Normal, c.text2))
                     }
                     if (device.state.isConnected) {
                         SmallPill("Disconnect", onClick = { device.disconnect() })
@@ -70,12 +70,12 @@ fun HomeScreen(
                     }
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(11.dp)) {
                 BigPill("Live Data", Icons.AutoMirrored.Filled.ShowChart, filled = false, onClick = onLiveData, modifier = Modifier.weight(1f))
                 BigPill("Measure", Icons.Outlined.Speed, filled = true, onClick = { nav.openStart() }, modifier = Modifier.weight(1f))
             }
-            Spacer(Modifier.height(8.dp))
-            Text("Recent", style = textStyle(22.sp, FontWeight.Bold, c.text))
+            Spacer(Modifier.height(7.dp))
+            Text("Recent", style = textStyle(18.sp, FontWeight.Bold, c.text))
             val recent = data.measurements.groupBy { it.sessionId }.values.sortedByDescending { s -> s.maxOf { it.takenAt } }.take(6)
             if (recent.isEmpty()) {
                 OutlinedCard { EmptyNote("Your measurements show up here. Tap Measure to take one.") }
@@ -85,36 +85,36 @@ fun HomeScreen(
                 val key = GroupKey.of(first)
                 val metric = key.type.headline
                 OutlinedCard(onClick = { nav.push(MeasureRoute.Result(first.sessionId)) }) {
-                    Row(Modifier.padding(horizontal = 18.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.padding(horizontal = 15.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                         Dot(key.type.dot)
-                        Spacer(Modifier.width(14.dp))
+                        Spacer(Modifier.width(11.dp))
                         Column(Modifier.weight(1f)) {
-                            Text(data.exercise(first.exerciseId)?.name ?: "—", style = textStyle(18.sp, FontWeight.SemiBold, c.text),
+                            Text(data.exercise(first.exerciseId)?.name ?: "—", style = textStyle(15.sp, FontWeight.SemiBold, c.text),
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Spacer(Modifier.height(4.dp))
-                            Text("${key.title} · ${shortDate(first.takenAt)}", style = textStyle(15.sp, FontWeight.Normal, c.text2))
+                            Text("${key.title} · ${shortDate(first.takenAt)}", style = textStyle(13.5.sp, FontWeight.Normal, c.text2))
                         }
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(10.dp))
                         Text(session.sortedBy { it.side.ordinal }.joinToString("  ") { "${it.side.label.first()} ${formatNumber(metric.of(it), metric.unit)}" },
-                            style = textStyle(16.sp, FontWeight.SemiBold, c.text))
+                            style = textStyle(13.sp, FontWeight.SemiBold, c.text))
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = c.text2)
                     }
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            OutlinedCard(onClick = onBenchmarks, radius = 28.dp) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    BoxedIcon(Icons.Outlined.EmojiEvents, c.blue, c.raised, 52.dp)
-                    Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.height(7.dp))
+            OutlinedCard(onClick = onBenchmarks, radius = 23.dp) {
+                Row(Modifier.padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
+                    BoxedIcon(Icons.Outlined.EmojiEvents, c.blue, c.raised, 43.dp)
+                    Spacer(Modifier.width(11.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Benchmarks", style = textStyle(18.sp, FontWeight.SemiBold, c.text))
+                        Text("Benchmarks", style = textStyle(15.sp, FontWeight.SemiBold, c.text))
                         Spacer(Modifier.height(4.dp))
-                        Text("Max pulls and critical force per grip, used by your workouts.", style = textStyle(15.sp, FontWeight.Normal, c.text2))
+                        Text("Max pulls and critical force per grip, used by your workouts.", style = textStyle(13.5.sp, FontWeight.Normal, c.text2))
                     }
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = c.text2)
                 }
             }
-            Spacer(Modifier.height(24.dp + LocalFloatingTabBarInset.current))
+            Spacer(Modifier.height(20.dp + LocalFloatingTabBarInset.current))
         }
     }
 }

@@ -468,7 +468,7 @@ private fun GrippyTabBar(current: Tab, onSelect: (Tab) -> Unit) {
     val c = measureColors()
     Column(Modifier.fillMaxWidth().background(if (c.dark) Color(0xFF1E1E23) else Color(0xFFFAFAFC))) {
         Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
-        Row(Modifier.fillMaxWidth().navigationBarsPadding().height(76.dp)) {
+        Row(Modifier.fillMaxWidth().navigationBarsPadding().height(62.dp)) {
             Tab.entries.forEach { tab ->
                 val on = tab == current
                 Column(
@@ -480,9 +480,9 @@ private fun GrippyTabBar(current: Tab, onSelect: (Tab) -> Unit) {
                     verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
                 ) {
                     Icon(if (on) tab.selectedIcon else tab.icon, contentDescription = null,
-                        tint = if (on) c.text else c.text3, modifier = Modifier.size(30.dp))
+                        tint = if (on) c.text else c.text3, modifier = Modifier.size(25.dp))
                     Text(tab.label, maxLines = 1,
-                        style = textStyle(15.sp, if (on) FontWeight.SemiBold else FontWeight.Medium, if (on) c.text else c.text3),
+                        style = textStyle(13.5.sp, if (on) FontWeight.SemiBold else FontWeight.Medium, if (on) c.text else c.text3),
                         modifier = Modifier.padding(top = 4.dp))
                 }
             }

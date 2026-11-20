@@ -69,9 +69,9 @@ fun ResultCurve(points: List<ForcePoint>, windowSeconds: Int, avg: Double, max: 
     val measurer = rememberTextMeasurer()
     Canvas(modifier) {
         if (points.size < 2) return@Canvas
-        val labelRoom = 34.dp.toPx()
+        val labelRoom = 28.dp.toPx()
         val w = size.width - labelRoom
-        val topPad = 22.dp.toPx()
+        val topPad = 18.dp.toPx()
         val h = size.height - topPad
         val top = if (max > 0) max * 1.05 else 1.0
         val span = max(windowSeconds.toDouble(), points.last().t).coerceAtLeast(0.1)
@@ -90,7 +90,7 @@ fun ResultCurve(points: List<ForcePoint>, windowSeconds: Int, avg: Double, max: 
         val ay = y(avg)
         drawLine(Color.White, Offset(0f, ay), Offset(w, ay), 1.4.dp.toPx(),
             pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
-        label(measurer, "avg", Offset(w + 6.dp.toPx(), ay), Color.White, 12, center = true)
+        label(measurer, "avg", Offset(w + 5.dp.toPx(), ay), Color.White, 12, center = true)
         // The peak.
         val peak = points.maxBy { it.kg }
         val px = x(peak.t)
@@ -98,10 +98,10 @@ fun ResultCurve(points: List<ForcePoint>, windowSeconds: Int, avg: Double, max: 
         drawCircle(Color.White, 5.dp.toPx(), Offset(px, py))
         drawCircle(Color(0xFF0A84FF), 3.4.dp.toPx(), Offset(px, py))
         drawCircle(Color.White, 2.4.dp.toPx(), Offset(px, py))
-        label(measurer, "Max ${formatKg(max)}", Offset(px + 4.dp.toPx(), py - 18.dp.toPx()), Color.White, 12, bold = true)
+        label(measurer, "Max ${formatKg(max)}", Offset(px + 4.dp.toPx(), py - 15.dp.toPx()), Color.White, 12, bold = true)
         val minText = "Min ${formatKg(min)}"
-        val minLayout = measurer.measure(minText, TextStyle(fontSize = 12.sp, color = Color.White.copy(alpha = .8f)))
-        drawText(minLayout, topLeft = Offset(w - minLayout.size.width - 6.dp.toPx(), size.height - minLayout.size.height - 2.dp.toPx()))
+        val minLayout = measurer.measure(minText, TextStyle(fontSize = 11.sp, color = Color.White.copy(alpha = .8f)))
+        drawText(minLayout, topLeft = Offset(w - minLayout.size.width - 5.dp.toPx(), size.height - minLayout.size.height - 2.dp.toPx()))
     }
 }
 
@@ -128,7 +128,7 @@ fun Sparkline(left: List<HistoryPoint>, right: List<HistoryPoint>, leftColor: Co
         val hi = all.maxOf { it.value }
         val t0 = all.minOf { it.at }
         val t1 = all.maxOf { it.at }
-        val pad = 7.dp.toPx()
+        val pad = 6.dp.toPx()
         val x = { at: Long -> if (t1 == t0) size.width / 2 else pad + ((at - t0).toFloat() / (t1 - t0)) * (size.width - 2 * pad) }
         val y = { v: Double -> if (hi == lo) size.height / 2 else (pad + (1 - (v - lo) / (hi - lo)) * (size.height - 2 * pad)).toFloat() }
         series(left, leftColor, x, y, 1.6.dp, 5.dp)
@@ -170,10 +170,10 @@ private fun niceTicks(lo: Double, hi: Double, count: Int = 4): List<Double> {
 fun HistoryChart(
     left: List<HistoryPoint>, right: List<HistoryPoint>, from: Long, to: Long,
     leftColor: Color, rightColor: Color, ink: Color, grid: Color, background: Color,
-    modifier: Modifier = Modifier.fillMaxWidth().height(260.dp),
+    modifier: Modifier = Modifier.fillMaxWidth().height(213.dp),
 ) {
     val measurer = rememberTextMeasurer()
-    val labelStyle = remember(ink) { TextStyle(fontSize = 15.sp, color = ink, fontFamily = run.nuri.getagrip.ui.theme.GripFonts.text) }
+    val labelStyle = remember(ink) { TextStyle(fontSize = 13.5.sp, color = ink, fontFamily = run.nuri.getagrip.ui.theme.GripFonts.text) }
     Canvas(modifier) {
         val all = left + right
         val lo0 = all.minOfOrNull { it.value } ?: 0.0
@@ -182,11 +182,11 @@ fun HistoryChart(
         val ticks = niceTicks(max(0.0, lo0 - pad), hi0 + pad)
         val lo = ticks.first()
         val hi = ticks.last()
-        val yAxis = 40.dp.toPx()
-        val bottomRoom = 36.dp.toPx()
-        val plotTop = 10.dp.toPx()
+        val yAxis = 33.dp.toPx()
+        val bottomRoom = 30.dp.toPx()
+        val plotTop = 8.dp.toPx()
         val plotH = size.height - bottomRoom - plotTop
-        val inset = 20.dp.toPx()
+        val inset = 16.dp.toPx()
         val plotL = yAxis + inset
         val plotR = size.width - inset
         val y = { v: Double -> (plotTop + (1 - (v - lo) / (hi - lo)) * plotH).toFloat() }
@@ -215,8 +215,8 @@ fun HistoryChart(
             val cx = x(at).coerceIn(yAxis + layout.size.width / 2f, size.width - layout.size.width / 2f)
             drawText(layout, topLeft = Offset(cx - layout.size.width / 2f, size.height - layout.size.height))
         }
-        series(left, leftColor, x, y, 2.dp, 8.dp, fill = background)
-        series(right, rightColor, x, y, 2.dp, 8.dp, fill = background)
+        series(left, leftColor, x, y, 2.dp, 7.dp, fill = background)
+        series(right, rightColor, x, y, 2.dp, 7.dp, fill = background)
     }
 }
 

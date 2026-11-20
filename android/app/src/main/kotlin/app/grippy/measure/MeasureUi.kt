@@ -104,7 +104,7 @@ fun textStyle(size: TextUnit, weight: FontWeight = FontWeight.Normal, color: Col
 @Composable
 fun BackButton(onBack: () -> Unit, tint: Color = measureColors().text) {
     IconButton(onClick = onBack) {
-        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Back", tint = tint, modifier = Modifier.size(34.dp))
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Back", tint = tint, modifier = Modifier.size(28.dp))
     }
 }
 
@@ -112,9 +112,9 @@ fun BackButton(onBack: () -> Unit, tint: Color = measureColors().text) {
 @Composable
 fun PageTitle(title: String, modifier: Modifier = Modifier, actions: @Composable RowScope.() -> Unit = {}) {
     val c = measureColors()
-    Row(modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
+    Row(modifier.fillMaxWidth().padding(start = 16.dp, end = 7.dp, top = 10.dp, bottom = 7.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = textStyle(32.sp, FontWeight.Bold, c.text, (-0.5).sp), modifier = Modifier.weight(1f))
+        Text(title, style = textStyle(26.sp, FontWeight.Bold, c.text, (-0.5).sp), modifier = Modifier.weight(1f))
         actions()
     }
 }
@@ -129,11 +129,11 @@ fun TopBar(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val c = measureColors()
-    Box(modifier.fillMaxWidth().statusBarsPadding().height(60.dp)) {
+    Box(modifier.fillMaxWidth().statusBarsPadding().height(49.dp)) {
         Row(Modifier.align(Alignment.CenterStart).padding(start = 4.dp)) { BackButton(onBack) }
-        Row(Modifier.align(Alignment.Center).padding(horizontal = 64.dp),
-            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(title, style = textStyle(21.sp, FontWeight.SemiBold, c.text), maxLines = 1,
+        Row(Modifier.align(Alignment.Center).padding(horizontal = 52.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = textStyle(17.sp, FontWeight.SemiBold, c.text), maxLines = 1,
                 overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
             titleExtra()
         }
@@ -146,12 +146,12 @@ fun TopBar(
 fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     val c = measureColors()
     Box(
-        modifier.fillMaxWidth().height(60.dp).clip(CircleShape)
+        modifier.fillMaxWidth().height(52.dp).clip(CircleShape)
             .background(if (enabled) c.blue else c.raisedHigh)
             .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = textStyle(19.sp, FontWeight.SemiBold, if (enabled) Color.White else c.text3))
+        Text(text, style = textStyle(16.sp, FontWeight.SemiBold, if (enabled) Color.White else c.text3))
     }
 }
 
@@ -160,10 +160,10 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
 fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color? = null) {
     val c = measureColors()
     Box(
-        modifier.fillMaxWidth().height(56.dp).clip(CircleShape).background(c.raised).clickable(onClick = onClick),
+        modifier.fillMaxWidth().height(46.dp).clip(CircleShape).background(c.raised).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, style = textStyle(17.sp, FontWeight.SemiBold, color ?: c.text))
+        Text(text, style = textStyle(14.sp, FontWeight.SemiBold, color ?: c.text))
     }
 }
 
@@ -172,13 +172,13 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
 fun BigPill(text: String, icon: ImageVector, filled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val c = measureColors()
     Row(
-        modifier.height(64.dp).clip(CircleShape).background(if (filled) c.blue else c.raised).clickable(onClick = onClick),
+        modifier.height(52.dp).clip(CircleShape).background(if (filled) c.blue else c.raised).clickable(onClick = onClick),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center,
     ) {
         val ink = if (filled) Color.White else c.text
-        Icon(icon, null, tint = ink, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(text, style = textStyle(19.sp, FontWeight.SemiBold, ink))
+        Icon(icon, null, tint = ink, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(7.dp))
+        Text(text, style = textStyle(15.5.sp, FontWeight.SemiBold, ink))
     }
 }
 
@@ -187,14 +187,14 @@ fun BigPill(text: String, icon: ImageVector, filled: Boolean, onClick: () -> Uni
 fun SmallPill(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, icon: ImageVector? = null) {
     val c = measureColors()
     Row(
-        modifier.height(44.dp).clip(CircleShape).background(c.raised).clickable(onClick = onClick).padding(horizontal = 18.dp),
+        modifier.height(36.dp).clip(CircleShape).background(c.raised).clickable(onClick = onClick).padding(horizontal = 15.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
-            Icon(icon, null, tint = c.text, modifier = Modifier.size(20.dp))
-            Spacer(Modifier.width(8.dp))
+            Icon(icon, null, tint = c.text, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(7.dp))
         }
-        Text(text, style = textStyle(16.sp, FontWeight.Medium, c.text), maxLines = 1, softWrap = false)
+        Text(text, style = textStyle(13.sp, FontWeight.Medium, c.text), maxLines = 1, softWrap = false)
     }
 }
 
@@ -203,7 +203,7 @@ fun SmallPill(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, 
 fun OutlinedCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    radius: Dp = 24.dp,
+    radius: Dp = 20.dp,
     color: Color? = null,
     borderColor: Color? = null,
     content: @Composable ColumnScope.() -> Unit,
@@ -226,23 +226,23 @@ fun <T> Segmented(
     label: (T) -> String,
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
-    height: Dp = 44.dp,
+    height: Dp = 36.dp,
     /** False: each segment as wide as its label (Average / Max / Total Load). */
     equal: Boolean = true,
-    fontSize: TextUnit = 16.sp,
+    fontSize: TextUnit = 13.sp,
 ) {
     val c = measureColors()
     Row(
-        modifier.height(height).clip(RoundedCornerShape(14.dp)).background(if (c.dark) Color(0xFF111114) else c.raised).padding(4.dp),
+        modifier.height(height).clip(RoundedCornerShape(11.dp)).background(if (c.dark) Color(0xFF111114) else c.raised).padding(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         options.forEach { option ->
             val on = option == selected
             Box(
-                (if (equal) Modifier.weight(1f) else Modifier).fillMaxHeight().clip(RoundedCornerShape(10.dp))
+                (if (equal) Modifier.weight(1f) else Modifier).fillMaxHeight().clip(RoundedCornerShape(8.dp))
                     .background(if (on) (if (c.dark) Color(0xFF2E2E36) else Color.White) else Color.Transparent)
                     .clickable { onSelect(option) }
-                    .padding(horizontal = if (equal) 6.dp else 9.dp),
+                    .padding(horizontal = if (equal) 5.dp else 7.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(label(option), maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
@@ -254,7 +254,7 @@ fun <T> Segmented(
 }
 
 @Composable
-fun Dot(color: Color, size: Dp = 12.dp) {
+fun Dot(color: Color, size: Dp = 10.dp) {
     Box(Modifier.size(size).clip(CircleShape).background(color))
 }
 
@@ -262,11 +262,11 @@ fun Dot(color: Color, size: Dp = 12.dp) {
 @Composable
 fun TypeChip(type: MeasureType) {
     val c = measureColors()
-    Row(Modifier.clip(CircleShape).background(c.raised).padding(horizontal = 12.dp, vertical = 6.dp),
+    Row(Modifier.clip(CircleShape).background(c.raised).padding(horizontal = 10.dp, vertical = 5.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Dot(type.dot, 10.dp)
-        Spacer(Modifier.width(8.dp))
-        Text(type.label, style = textStyle(16.sp, FontWeight.SemiBold, c.text2))
+        Dot(type.dot, 8.dp)
+        Spacer(Modifier.width(7.dp))
+        Text(type.label, style = textStyle(13.sp, FontWeight.SemiBold, c.text2))
     }
 }
 
@@ -276,7 +276,7 @@ fun ValueWithUnit(value: String, unit: String, size: TextUnit, color: Color, uni
     Row(modifier, verticalAlignment = Alignment.Bottom) {
         Text(value, style = textStyle(size, FontWeight.SemiBold, color, (-0.5).sp))
         if (unit.isNotEmpty()) {
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(5.dp))
             Text(unit, style = textStyle(size * 0.5f, FontWeight.Medium, unitColor), modifier = Modifier.padding(bottom = (size.value * 0.12f).dp))
         }
     }
@@ -285,29 +285,29 @@ fun ValueWithUnit(value: String, unit: String, size: TextUnit, color: Color, uni
 /** The caps section label: "LATEST", "HISTORY". */
 @Composable
 fun CapsHeader(text: String, modifier: Modifier = Modifier) {
-    Text(text.uppercase(), style = textStyle(17.sp, FontWeight.SemiBold, measureColors().text2, 0.5.sp), modifier = modifier)
+    Text(text.uppercase(), style = textStyle(14.sp, FontWeight.SemiBold, measureColors().text2, 0.5.sp), modifier = modifier)
 }
 
 @Composable
 fun SheetSurface(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 16.dp), content = content)
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 13.dp), content = content)
 }
 
 @Composable
 fun EmptyNote(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = textStyle(16.sp, FontWeight.Normal, measureColors().text2), textAlign = TextAlign.Center,
-        modifier = modifier.fillMaxWidth().padding(24.dp))
+    Text(text, style = textStyle(13.sp, FontWeight.Normal, measureColors().text2), textAlign = TextAlign.Center,
+        modifier = modifier.fillMaxWidth().padding(20.dp))
 }
 
 @Composable
-fun BoxedIcon(icon: ImageVector, tint: Color, background: Color, size: Dp = 56.dp, content: @Composable BoxScope.() -> Unit = {}) {
+fun BoxedIcon(icon: ImageVector, tint: Color, background: Color, size: Dp = 46.dp, content: @Composable BoxScope.() -> Unit = {}) {
     Box(Modifier.size(size).clip(CircleShape).background(background), contentAlignment = Alignment.Center) {
         Icon(icon, null, tint = tint, modifier = Modifier.size(size * 0.5f))
         content()
     }
 }
 
-val PagePadding = PaddingValues(horizontal = 20.dp)
+val PagePadding = PaddingValues(horizontal = 16.dp)
 
 @Composable
 fun SurfaceBox(content: @Composable () -> Unit) {

@@ -8,7 +8,9 @@ import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.hasScrollAction
@@ -182,16 +184,48 @@ class ScreenshotTest(private val theme: String) {
         shoot("16-hand-sheet")
     }
 
-    @Test fun measuring() {
+    @Test fun startSheetExercise() {
+        openStartSheet()
+        compose.onNodeWithText("Create custom exercise").performScrollTo()
+        settle()
+        shoot("15b-start-sheet-exercise")
+    }
+
+    @Test fun peakHandSheet() {
+        openStartSheet()
+        tap("Start Peak")
+        shoot("16b-peak-hand-sheet")
+    }
+
+    private fun openStartSheet() {
         tabTap("Measure")
         compose.onAllNodes(hasText("Measure") and hasClickAction() and
             !SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected))[0].performClick()
         settle()
+    }
+
+    @Test fun peakWaiting() {
+        openStartSheet()
         tap("Start Peak")
+        tap("Measure left")
+        repeat(10) {
+            ShadowLooper.idleMainLooper(200, java.util.concurrent.TimeUnit.MILLISECONDS)
+            compose.mainClock.advanceTimeBy(200)
+            Thread.sleep(50)
+            compose.waitForIdle()
+        }
+        val dir = File(System.getProperty("grippy.screenshots.dir") ?: "build/outputs/roborazzi")
+        compose.onRoot().captureRoboImage(File(dir, "17b-peak-${if (theme == "night") "dark" else "light"}.png"))
+    }
+
+    @Test fun measuring() {
+        openStartSheet()
+        tap("How long you can hold force")
+        tap("Start Endurance")
         // The sheet's last field is Start after.
         compose.onAllNodes(androidx.compose.ui.test.hasSetTextAction()).let { it[it.fetchSemanticsNodes().size - 1] }
             .performTextReplacement("1")
-        tap("Continue")
+        tap("Measure left")
         // The mock gauge connects, the one-second countdown runs (looper time), and the pull
         // records (wall time).
         repeat(25) {

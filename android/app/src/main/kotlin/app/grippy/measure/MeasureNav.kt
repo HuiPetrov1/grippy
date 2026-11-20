@@ -88,7 +88,8 @@ class MeasureNavigator : ViewModel() {
  * the scale through [receive]; [drive] runs the clock. Both are on the main thread.
  */
 class MeasureRun(val request: MeasureRequest) {
-    enum class Stage { Connecting, Countdown, Recording, Done }
+    /** Waiting: a passive Peak, armed until the pull starts. */
+    enum class Stage { Connecting, Countdown, Waiting, Recording, Done }
 
     var stage by mutableStateOf(Stage.Connecting)
         private set
@@ -115,8 +116,23 @@ class MeasureRun(val request: MeasureRequest) {
 
     private var recordStart = 0L
 
+    /** Peak has no set length: it records one pull, from the start of the effort to letting go. */
+    val isPeak: Boolean get() = request.type == MeasureType.Peak
+
+    /** The longest a recording can run; Peak usually ends sooner, when the person lets go. */
     val windowSeconds: Int
-        get() = if (request.type == MeasureType.CriticalForce) CF_TOTAL_SECONDS else request.seconds
+        get() = when (request.type) {
+            MeasureType.CriticalForce -> CF_TOTAL_SECONDS
+            MeasureType.Peak -> PEAK_MAX_SECONDS
+            else -> request.seconds
+        }
+
+    /** How long each hand's recording actually ran, which is what gets saved. */
+    fun secondsFor(hand: Hand): Int {
+        if (!isPeak) return request.seconds
+        val last = results[hand]?.lastOrNull()?.t ?: return 1
+        return kotlin.math.ceil(last).toInt().coerceAtLeast(1)
+    }
 
     /** Critical Force: which rep, and whether it is a pull or a rest. */
     val cfRep: Int get() = (elapsed / (CF_WORK_SECONDS + CF_REST_SECONDS)).toInt().coerceAtMost(CF_REPS - 1)
@@ -148,17 +164,25 @@ class MeasureRun(val request: MeasureRequest) {
             elapsed = 0.0
             stage = Stage.Countdown
             tare()
-            for (s in request.startAfter downTo 1) {
-                countdown = s
-                if (s <= 3) cue(Cue.Tick)
-                delay(1000)
+            if (isPeak && request.startAfter == 0) {
+                // Passive: armed until the pull starts, and the recording starts with it.
+                stage = Stage.Waiting
+                while (liveKg < PEAK_TRIGGER_KG) delay(20)
+            } else {
+                for (s in request.startAfter downTo 1) {
+                    countdown = s
+                    if (s <= 3) cue(Cue.Tick)
+                    delay(1000)
+                }
             }
             countdown = 0
             recordStart = System.nanoTime()
             stage = Stage.Recording
-            points.add(ForcePoint(0.0, liveKg))
+            points.add(ForcePoint(0.0, if (isPeak && request.startAfter == 0) 0.0 else liveKg))
             cue(Cue.Go)
             var wasPulling = true
+            var releasedAt: Double? = null
+            var end = windowSeconds.toDouble()
             while (true) {
                 val t = (System.nanoTime() - recordStart) / 1e9
                 elapsed = t.coerceAtMost(windowSeconds.toDouble())
@@ -167,9 +191,18 @@ class MeasureRun(val request: MeasureRequest) {
                     wasPulling = cfPulling
                     cue(if (wasPulling) Cue.Go else Cue.Rest)
                 }
+                if (isPeak) {
+                    // Done once they let go: force back under a quarter of the peak for a moment.
+                    if (peakKg >= PEAK_TRIGGER_KG && liveKg < max(PEAK_TRIGGER_KG / 2, peakKg * PEAK_RELEASE_FRACTION)) {
+                        val since = releasedAt ?: t.also { releasedAt = it }
+                        if (t - since >= PEAK_RELEASE_SECONDS) { end = t; break }
+                    } else {
+                        releasedAt = null
+                    }
+                }
                 delay(40)
             }
-            points.add(ForcePoint(windowSeconds.toDouble(), liveKg))
+            points.add(ForcePoint(end, liveKg))
             results[hand] = points.toList()
             cue(Cue.Stop)
         }

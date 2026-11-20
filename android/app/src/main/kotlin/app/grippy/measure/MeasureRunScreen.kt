@@ -131,17 +131,18 @@ fun MeasureRunScreen(nav: MeasureNavigator, run: MeasureRun) {
             title = run.request.type.label + if (run.request.type == MeasureType.Endurance) " ${run.request.seconds} s" else "",
             onBack = { confirmQuit = true },
         )
-        Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             when (run.stage) {
                 MeasureRun.Stage.Connecting -> Connecting(device.state.label)
                 MeasureRun.Stage.Countdown -> Countdown(run)
-                MeasureRun.Stage.Recording -> Recording(run)
+                MeasureRun.Stage.Waiting -> Waiting(run)
+                MeasureRun.Stage.Recording -> if (run.isPeak) PeakRecording(run) else Recording(run)
                 MeasureRun.Stage.Done -> Unit
             }
         }
-        Column(Modifier.navigationBarsPadding().padding(20.dp)) {
+        Column(Modifier.navigationBarsPadding().padding(16.dp)) {
             if (run.stage == MeasureRun.Stage.Recording) {
-                SecondaryButton("Stop", onClick = { run.stopEarly() })
+                SecondaryButton(if (run.isPeak) "Done" else "Stop", onClick = { run.stopEarly() })
             } else {
                 SecondaryButton("Cancel", onClick = { nav.pop() })
             }
@@ -162,35 +163,71 @@ fun MeasureRunScreen(nav: MeasureNavigator, run: MeasureRun) {
 @Composable
 private fun HandBadge(hand: Hand) {
     val c = measureColors()
-    Row(Modifier.clip(CircleShape).background(c.raised).padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Dot(if (hand == Hand.Left) c.left else c.right, 10.dp)
-        Spacer(Modifier.width(8.dp))
-        Text("${hand.label} hand", style = textStyle(17.sp, FontWeight.SemiBold, c.text))
+    Row(Modifier.clip(CircleShape).background(c.raised).padding(horizontal = 13.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Dot(if (hand == Hand.Left) c.left else c.right, 8.dp)
+        Spacer(Modifier.width(7.dp))
+        Text("${hand.label} hand", style = textStyle(14.sp, FontWeight.SemiBold, c.text))
     }
 }
 
 @Composable
 private fun Connecting(label: String) {
     val c = measureColors()
-    Spacer(Modifier.height(120.dp))
-    CircularProgressIndicator(color = c.blue, strokeWidth = 4.dp, modifier = Modifier.size(56.dp))
-    Spacer(Modifier.height(28.dp))
-    Text("Connecting to your scale…", style = textStyle(22.sp, FontWeight.SemiBold, c.text), textAlign = TextAlign.Center)
-    Spacer(Modifier.height(10.dp))
-    Text("Turn the scale on and keep it close. $label", style = textStyle(16.sp, FontWeight.Normal, c.text2), textAlign = TextAlign.Center)
+    Spacer(Modifier.height(98.dp))
+    CircularProgressIndicator(color = c.blue, strokeWidth = 4.dp, modifier = Modifier.size(46.dp))
+    Spacer(Modifier.height(23.dp))
+    Text("Connecting to your scale…", style = textStyle(18.sp, FontWeight.SemiBold, c.text), textAlign = TextAlign.Center)
+    Spacer(Modifier.height(8.dp))
+    Text("Turn the scale on and keep it close. $label", style = textStyle(13.sp, FontWeight.Normal, c.text2), textAlign = TextAlign.Center)
 }
 
 @Composable
 private fun Countdown(run: MeasureRun) {
     val c = measureColors()
-    Spacer(Modifier.height(40.dp))
+    Spacer(Modifier.height(33.dp))
     HandBadge(run.hand)
+    Spacer(Modifier.height(16.dp))
+    Text(if (run.handIndex > 0) "Switch hands" else "Get ready", style = textStyle(19.5.sp, FontWeight.SemiBold, c.text2))
+    Text(if (run.countdown > 0) "${run.countdown}" else "…", style = textStyle(123.sp, FontWeight.Bold, c.text, (-4).sp))
+    Text("Starts in", style = textStyle(14.sp, FontWeight.Normal, c.text2))
+    Spacer(Modifier.height(30.dp))
+    Text("Scale reads ${formatKg(run.liveKg)} kg", style = textStyle(14.sp, FontWeight.Medium, c.text3))
+}
+
+/** Passive Peak: armed, and it starts by itself the moment they pull. */
+@Composable
+private fun Waiting(run: MeasureRun) {
+    val c = measureColors()
+    Spacer(Modifier.height(33.dp))
+    HandBadge(run.hand)
+    Spacer(Modifier.height(16.dp))
+    Text(if (run.handIndex > 0) "Switch hands" else "Ready", style = textStyle(20.sp, FontWeight.SemiBold, c.text2))
+    Spacer(Modifier.height(10.dp))
+    Text("Pull when you're ready", style = textStyle(26.sp, FontWeight.Bold, c.text), textAlign = TextAlign.Center)
+    Spacer(Modifier.height(8.dp))
+    Text("It starts when you pull and stops when you let go.", style = textStyle(14.sp, FontWeight.Normal, c.text2),
+        textAlign = TextAlign.Center)
+    Spacer(Modifier.height(30.dp))
+    Text("Scale reads ${formatKg(run.liveKg)} kg", style = textStyle(14.sp, FontWeight.Medium, c.text3))
+}
+
+/** Peak: the most force in one pull. The peak is the big number; it ends when they let go. */
+@Composable
+private fun PeakRecording(run: MeasureRun) {
+    val c = measureColors()
+    val handColor = if (run.hand == Hand.Left) c.left else c.right
+    Spacer(Modifier.height(13.dp))
+    HandBadge(run.hand)
+    Spacer(Modifier.height(13.dp))
+    Text("Pull as hard as you can!", style = textStyle(20.sp, FontWeight.SemiBold, c.text2))
+    Text("PEAK", style = textStyle(14.sp, FontWeight.SemiBold, c.text3, 1.sp), modifier = Modifier.padding(top = 10.dp))
+    ValueWithUnit(formatKg(run.peakKg), "kg", 85.sp, c.text, c.text2)
+    Text("Now ${formatKg(run.liveKg)} kg · ${"%.1f".format(run.elapsed)} s", style = textStyle(15.sp, FontWeight.Medium, c.text2))
     Spacer(Modifier.height(20.dp))
-    Text(if (run.handIndex > 0) "Switch hands" else "Get ready", style = textStyle(24.sp, FontWeight.SemiBold, c.text2))
-    Text(if (run.countdown > 0) "${run.countdown}" else "…", style = textStyle(150.sp, FontWeight.Bold, c.text, (-4).sp))
-    Text("Starts in", style = textStyle(17.sp, FontWeight.Normal, c.text2))
-    Spacer(Modifier.height(36.dp))
-    Text("Scale reads ${formatKg(run.liveKg)} kg", style = textStyle(17.sp, FontWeight.Medium, c.text3))
+    val window = maxOf(5, ceil(run.elapsed + 1).toInt())
+    LiveCurve(run.points.toList(), window, handColor, c.divider, Modifier.fillMaxWidth().height(164.dp))
+    Spacer(Modifier.height(12.dp))
+    Text("Stops by itself when you let go", style = textStyle(13.5.sp, FontWeight.Normal, c.text3))
 }
 
 @Composable
@@ -198,36 +235,36 @@ private fun Recording(run: MeasureRun) {
     val c = measureColors()
     val cf = run.request.type == MeasureType.CriticalForce
     val handColor = if (run.hand == Hand.Left) c.left else c.right
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(13.dp))
     HandBadge(run.hand)
-    Spacer(Modifier.height(16.dp))
+    Spacer(Modifier.height(13.dp))
     if (cf) {
         val pulling = run.cfPulling
-        Box(Modifier.clip(CircleShape).background(if (pulling) c.blue else c.raised).padding(horizontal = 22.dp, vertical = 8.dp)) {
+        Box(Modifier.clip(CircleShape).background(if (pulling) c.blue else c.raised).padding(horizontal = 18.dp, vertical = 7.dp)) {
             Text(if (pulling) "PULL · ${ceil(run.cfPhaseLeft).toInt()} s" else "REST · ${ceil(run.cfPhaseLeft).toInt()} s",
-                style = textStyle(18.sp, FontWeight.Bold, if (pulling) Color.White else c.text, 1.sp))
+                style = textStyle(15.sp, FontWeight.Bold, if (pulling) Color.White else c.text, 1.sp))
         }
-        Spacer(Modifier.height(8.dp))
-        Text("Rep ${run.cfRep + 1} / $CF_REPS", style = textStyle(18.sp, FontWeight.SemiBold, c.text2))
+        Spacer(Modifier.height(7.dp))
+        Text("Rep ${run.cfRep + 1} / $CF_REPS", style = textStyle(15.sp, FontWeight.SemiBold, c.text2))
     } else {
-        Text("Pull!", style = textStyle(24.sp, FontWeight.SemiBold, c.text2))
+        Text("Pull!", style = textStyle(19.5.sp, FontWeight.SemiBold, c.text2))
     }
-    ValueWithUnit(formatKg(run.liveKg), "kg", 104.sp, c.text, c.text2)
-    Text("Peak ${formatKg(run.peakKg)} kg", style = textStyle(18.sp, FontWeight.Medium, c.text2))
-    Spacer(Modifier.height(24.dp))
+    ValueWithUnit(formatKg(run.liveKg), "kg", 85.5.sp, c.text, c.text2)
+    Text("Peak ${formatKg(run.peakKg)} kg", style = textStyle(15.sp, FontWeight.Medium, c.text2))
+    Spacer(Modifier.height(20.dp))
     val left = (run.windowSeconds - run.elapsed).coerceAtLeast(0.0)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("${run.elapsed.toInt()} s", style = textStyle(15.sp, FontWeight.Medium, c.text3))
-        Text("${ceil(left).toInt()} s left", style = textStyle(15.sp, FontWeight.Medium, c.text3))
+        Text("${run.elapsed.toInt()} s", style = textStyle(13.5.sp, FontWeight.Medium, c.text3))
+        Text("${ceil(left).toInt()} s left", style = textStyle(13.5.sp, FontWeight.Medium, c.text3))
     }
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(7.dp))
     LinearProgressIndicator(
         progress = { (run.elapsed / run.windowSeconds).toFloat().coerceIn(0f, 1f) },
-        modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape),
+        modifier = Modifier.fillMaxWidth().height(7.dp).clip(CircleShape),
         color = c.blue, trackColor = c.raised, drawStopIndicator = {},
     )
-    Spacer(Modifier.height(24.dp))
-    LiveCurve(run.points.toList(), run.windowSeconds, handColor, c.divider, Modifier.fillMaxWidth().height(200.dp))
+    Spacer(Modifier.height(20.dp))
+    LiveCurve(run.points.toList(), run.windowSeconds, handColor, c.divider, Modifier.fillMaxWidth().height(164.dp))
 }
 
 /** After measuring: the numbers, and which exercise they belong to. */
@@ -250,28 +287,28 @@ fun MeasureReviewScreen(nav: MeasureNavigator, run: MeasureRun) {
 
     Column(Modifier.fillMaxSize().background(c.bg).imePadding()) {
         TopBar("Result", onBack = { confirmDiscard = true })
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
-            Text(GroupKey(type, run.request.seconds).title, style = textStyle(28.sp, FontWeight.Bold, c.text))
-            Text(longDate(run.startedAt), style = textStyle(16.sp, FontWeight.Normal, c.text2))
-            Spacer(Modifier.height(18.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            Text(GroupKey(type, run.request.seconds).title, style = textStyle(23.sp, FontWeight.Bold, c.text))
+            Text(longDate(run.startedAt), style = textStyle(13.sp, FontWeight.Normal, c.text2))
+            Spacer(Modifier.height(15.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 run.request.hands.forEach { hand ->
                     val points = run.results[hand] ?: return@forEach
-                    val draft = MeasurementEntity.from(0, run.sessionId, type, hand, run.request.seconds, run.startedAt, points, settings.bodyWeightKg)
+                    val draft = MeasurementEntity.from(0, run.sessionId, type, hand, run.secondsFor(hand), run.startedAt, points, settings.bodyWeightKg)
                     OutlinedCard(Modifier.weight(1f)) {
-                        Column(Modifier.padding(16.dp)) {
+                        Column(Modifier.padding(13.dp)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Dot(if (hand == Hand.Left) c.left else c.right, 10.dp)
-                                Spacer(Modifier.width(8.dp))
-                                Text(hand.label, style = textStyle(17.sp, FontWeight.Medium, c.text2))
+                                Dot(if (hand == Hand.Left) c.left else c.right, 8.dp)
+                                Spacer(Modifier.width(7.dp))
+                                Text(hand.label, style = textStyle(14.sp, FontWeight.Medium, c.text2))
                             }
+                            Spacer(Modifier.height(7.dp))
+                            ValueWithUnit(formatNumber(draft.headline, type.headline.unit), type.headline.unit, 33.sp, c.text, c.text2)
+                            Text(type.headline.label, style = textStyle(12.5.sp, FontWeight.Normal, c.text3))
                             Spacer(Modifier.height(8.dp))
-                            ValueWithUnit(formatNumber(draft.headline, type.headline.unit), type.headline.unit, 40.sp, c.text, c.text2)
-                            Text(type.headline.label, style = textStyle(14.sp, FontWeight.Normal, c.text3))
-                            Spacer(Modifier.height(10.dp))
                             LiveCurve(MeasureMath.decode(draft.samples), draft.durationSec, if (hand == Hand.Left) c.left else c.right, c.divider,
-                                Modifier.fillMaxWidth().height(70.dp))
-                            Spacer(Modifier.height(10.dp))
+                                Modifier.fillMaxWidth().height(57.dp))
+                            Spacer(Modifier.height(8.dp))
                             StatLine("Max", "${formatKg(draft.maxKg)} kg")
                             StatLine("Average", "${formatKg(draft.avgKg)} kg")
                             if (type == MeasureType.Rfd) StatLine("RFD", "${draft.rfd.toInt()} kg/s")
@@ -280,58 +317,58 @@ fun MeasureReviewScreen(nav: MeasureNavigator, run: MeasureRun) {
                     }
                 }
             }
-            Spacer(Modifier.height(28.dp))
+            Spacer(Modifier.height(23.dp))
             if (preset != null) {
-                Text("Exercise", style = textStyle(19.sp, FontWeight.SemiBold, c.text))
-                Spacer(Modifier.height(10.dp))
+                Text("Exercise", style = textStyle(15.5.sp, FontWeight.SemiBold, c.text))
+                Spacer(Modifier.height(8.dp))
                 ExerciseRow(preset, data.of(preset.id)) {}
             } else {
-                Text("Pick the exercise", style = textStyle(19.sp, FontWeight.SemiBold, c.text))
-                Spacer(Modifier.height(12.dp))
-                Row(Modifier.fillMaxWidth().height(60.dp).clip(RoundedCornerShape(18.dp)).background(c.raised).padding(horizontal = 18.dp),
+                Text("Pick the exercise", style = textStyle(15.5.sp, FontWeight.SemiBold, c.text))
+                Spacer(Modifier.height(10.dp))
+                Row(Modifier.fillMaxWidth().height(49.dp).clip(RoundedCornerShape(15.dp)).background(c.raised).padding(horizontal = 15.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f)) {
-                        if (newName.isEmpty()) Text("New exercise, e.g. supinated front raise", style = textStyle(17.sp, FontWeight.Normal, c.text3),
+                        if (newName.isEmpty()) Text("New exercise, e.g. supinated front raise", style = textStyle(14.sp, FontWeight.Normal, c.text3),
                             maxLines = 1, overflow = TextOverflow.Ellipsis)
                         BasicTextField(newName, { newName = it; if (it.isNotBlank()) picked = null }, singleLine = true,
-                            textStyle = textStyle(17.sp, FontWeight.Normal, c.text), cursorBrush = SolidColor(c.blue),
+                            textStyle = textStyle(14.sp, FontWeight.Normal, c.text), cursorBrush = SolidColor(c.blue),
                             keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
                             modifier = Modifier.fillMaxWidth())
                     }
                 }
                 if (data.exercises.isNotEmpty()) {
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(13.dp))
                     OutlinedCard {
                         data.exercises.sortedByDescending { e -> data.of(e.id).maxOfOrNull { it.takenAt } ?: e.createdAt }.forEachIndexed { i, e ->
-                            Row(Modifier.fillMaxWidth().clickable { picked = e.id; newName = "" }.padding(horizontal = 12.dp, vertical = 10.dp),
+                            Row(Modifier.fillMaxWidth().clickable { picked = e.id; newName = "" }.padding(horizontal = 10.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically) {
                                 RadioButton(picked == e.id, onClick = { picked = e.id; newName = "" },
                                     colors = RadioButtonDefaults.colors(selectedColor = c.blue, unselectedColor = c.text3))
-                                Spacer(Modifier.width(8.dp))
-                                Text(e.name, style = textStyle(17.sp, FontWeight.Medium, c.text), modifier = Modifier.weight(1f))
+                                Spacer(Modifier.width(7.dp))
+                                Text(e.name, style = textStyle(14.sp, FontWeight.Medium, c.text), modifier = Modifier.weight(1f))
                             }
-                            if (i < data.exercises.lastIndex) HorizontalDivider(Modifier.padding(start = 64.dp), color = c.divider)
+                            if (i < data.exercises.lastIndex) HorizontalDivider(Modifier.padding(start = 52.dp), color = c.divider)
                         }
                     }
                 }
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(20.dp))
         }
-        Column(Modifier.navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
+        Column(Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
             PrimaryButton(if (saving) "Saving…" else "Save", enabled = canSave, onClick = {
                 saving = true
                 scope.launch {
                     val exerciseId = picked ?: store.addExercise(newName, run.request.folderId)
                     store.save(run.request.hands.mapNotNull { hand ->
                         run.results[hand]?.let { points ->
-                            MeasurementEntity.from(exerciseId, run.sessionId, type, hand, run.request.seconds, run.startedAt, points, settings.bodyWeightKg)
+                            MeasurementEntity.from(exerciseId, run.sessionId, type, hand, run.secondsFor(hand), run.startedAt, points, settings.bodyWeightKg)
                         }
                     })
                     nav.showExercise(exerciseId)
                 }
             })
             TextButton(onClick = { confirmDiscard = true }, modifier = Modifier.fillMaxWidth()) {
-                Text("Discard", style = textStyle(17.sp, FontWeight.Medium, c.text2))
+                Text("Discard", style = textStyle(14.sp, FontWeight.Medium, c.text2))
             }
         }
     }
@@ -350,8 +387,8 @@ fun MeasureReviewScreen(nav: MeasureNavigator, run: MeasureRun) {
 private fun StatLine(label: String, value: String) {
     val c = measureColors()
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Text(label, style = textStyle(14.sp, FontWeight.Normal, c.text2), modifier = Modifier.weight(1f))
-        Text(value, style = textStyle(14.sp, FontWeight.SemiBold, c.text))
+        Text(label, style = textStyle(12.5.sp, FontWeight.Normal, c.text2), modifier = Modifier.weight(1f))
+        Text(value, style = textStyle(12.5.sp, FontWeight.SemiBold, c.text))
     }
 }
 

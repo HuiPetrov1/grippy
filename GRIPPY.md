@@ -21,8 +21,10 @@ changes merge cleanly.
   Settings and Benchmarks open from Home.
 - A **Measure** section for any exercise, not just climbing
   (`android/app/src/main/kotlin/app/grippy/measure/`). Pick Peak, Endurance, Critical Force
-  (24 × 7 s/3 s) or RFD, then the hands, duration and countdown. Afterwards, pick or name the
-  exercise. Exercises live in folders, and each has Summary / Measure / How to tabs, a
+  (24 × 7 s/3 s) or RFD, then the hands, duration and countdown. Peak has no duration: it
+  records one pull and keeps the highest force, ending when you let go (Passive starts the
+  moment you pull; Active counts you in). Pick or create the exercise in the start sheet, or
+  afterwards. Exercises live in folders, and each has Summary / Measure / How to tabs, a
   history chart per measurement type (Average / Max / Total Load, kg or % of bodyweight),
   and a shareable result card. The data lives in its own Room database, `grippy-measure.db`,
   so upstream's schema is untouched.

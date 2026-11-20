@@ -83,7 +83,7 @@ fun ExerciseScreen(nav: MeasureNavigator, route: MeasureRoute.Exercise) {
     Column(Modifier.fillMaxSize().background(c.bg)) {
         TopBar(exercise.name, onBack = { nav.pop() }, actions = {
             Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreHoriz, "More", tint = c.text, modifier = Modifier.size(30.dp)) }
+                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreHoriz, "More", tint = c.text, modifier = Modifier.size(25.dp)) }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                     DropdownMenuItem(text = { Text("Rename") }, onClick = { menu = false; renaming = true })
                     DropdownMenuItem(text = { Text("Move to folder") }, onClick = { menu = false; moving = true })
@@ -94,8 +94,8 @@ fun ExerciseScreen(nav: MeasureNavigator, route: MeasureRoute.Exercise) {
         Row(Modifier.fillMaxWidth()) {
             listOf("Summary", "Measure", "How to").forEachIndexed { i, label ->
                 Column(Modifier.weight(1f).clickable { tab = i }, horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(label, style = textStyle(21.sp, if (tab == i) FontWeight.SemiBold else FontWeight.Medium, if (tab == i) c.text else c.text3),
-                        modifier = Modifier.padding(vertical = 14.dp))
+                    Text(label, style = textStyle(17.sp, if (tab == i) FontWeight.SemiBold else FontWeight.Medium, if (tab == i) c.text else c.text3),
+                        modifier = Modifier.padding(vertical = 11.dp))
                     Box(Modifier.fillMaxWidth().height(3.dp).background(if (tab == i) c.text else androidx.compose.ui.graphics.Color.Transparent))
                 }
             }
@@ -118,9 +118,9 @@ fun ExerciseScreen(nav: MeasureNavigator, route: MeasureRoute.Exercise) {
             text = {
                 Column {
                     (listOf<Pair<Long?, String>>(null to "My Measures") + data.folders.map { it.id to it.name }).forEach { (id, name) ->
-                        Text(name, style = textStyle(18.sp, if (exercise.folderId == id) FontWeight.Bold else FontWeight.Normal, c.text),
+                        Text(name, style = textStyle(15.sp, if (exercise.folderId == id) FontWeight.Bold else FontWeight.Normal, c.text),
                             modifier = Modifier.fillMaxWidth().clickable { store.updateExercise(exercise.copy(folderId = id)); moving = false }
-                                .padding(vertical = 12.dp))
+                                .padding(vertical = 10.dp))
                     }
                 }
             },
@@ -148,21 +148,21 @@ private fun MeasureListTab(nav: MeasureNavigator, exercise: ExerciseEntity, meas
     val groups = groupsOf(measurements)
     LazyColumn(Modifier.fillMaxSize()) {
         item {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Measurements", style = textStyle(27.sp, FontWeight.Bold, c.text, (-0.3).sp))
-                Spacer(Modifier.width(10.dp))
-                Text("${groups.size}", style = textStyle(24.sp, FontWeight.Medium, c.text3))
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Measurements", style = textStyle(22.sp, FontWeight.Bold, c.text, (-0.3).sp))
+                Spacer(Modifier.width(8.dp))
+                Text("${groups.size}", style = textStyle(19.5.sp, FontWeight.Medium, c.text3))
                 Spacer(Modifier.weight(1f))
                 SmallPill("Measure", onClick = { nav.openStart(StartContext(exerciseId = exercise.id)) }, icon = Icons.Filled.Add)
             }
         }
         if (groups.isEmpty()) item { EmptyNote("Nothing measured yet. Tap Measure to take the first one.") }
         items(groups, key = { it.first.id }) { (key, ms) ->
-            GroupCard(key, ms, Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
+            GroupCard(key, ms, Modifier.padding(horizontal = 16.dp, vertical = 7.dp)) {
                 nav.push(MeasureRoute.Group(exercise.id, key.id))
             }
         }
-        item { Spacer(Modifier.navigationBarsPadding().height(24.dp)) }
+        item { Spacer(Modifier.navigationBarsPadding().height(20.dp)) }
     }
 }
 
@@ -171,23 +171,23 @@ private fun GroupCard(key: GroupKey, ms: List<MeasurementEntity>, modifier: Modi
     val c = measureColors()
     val latest = ms.maxOf { it.takenAt }
     val metric = key.type.headline
-    OutlinedCard(modifier, onClick = onClick, radius = 30.dp) {
-        Row(Modifier.padding(horizontal = 20.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+    OutlinedCard(modifier, onClick = onClick, radius = 25.dp) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Dot(key.type.dot)
-            Spacer(Modifier.width(14.dp))
-            Text(key.title, style = textStyle(21.sp, FontWeight.SemiBold, c.text), modifier = Modifier.weight(1f), maxLines = 1)
-            Text(longDate(latest), style = textStyle(16.sp, FontWeight.Normal, c.text2))
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = c.text2, modifier = Modifier.size(26.dp))
+            Spacer(Modifier.width(11.dp))
+            Text(key.title, style = textStyle(17.sp, FontWeight.SemiBold, c.text), modifier = Modifier.weight(1f), maxLines = 1)
+            Text(longDate(latest), style = textStyle(13.sp, FontWeight.Normal, c.text2))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = c.text2, modifier = Modifier.size(21.dp))
         }
         HorizontalDivider(color = c.divider)
-        Row(Modifier.padding(horizontal = 20.dp, vertical = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(horizontal = 16.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Hand.entries.forEach { hand ->
                 val last = ms.filter { it.side == hand }.maxByOrNull { it.takenAt }
-                Column(Modifier.padding(end = 26.dp)) {
-                    Text(hand.label, style = textStyle(16.sp, FontWeight.Normal, c.text2))
-                    Spacer(Modifier.height(10.dp))
+                Column(Modifier.padding(end = 21.dp)) {
+                    Text(hand.label, style = textStyle(13.sp, FontWeight.Normal, c.text2))
+                    Spacer(Modifier.height(8.dp))
                     Text(last?.let { "${formatNumber(metric.of(it), metric.unit)} ${metric.unit}" } ?: "—",
-                        style = textStyle(22.sp, FontWeight.SemiBold, c.text))
+                        style = textStyle(18.sp, FontWeight.SemiBold, c.text))
                 }
             }
             Spacer(Modifier.weight(1f))
@@ -195,7 +195,7 @@ private fun GroupCard(key: GroupKey, ms: List<MeasurementEntity>, modifier: Modi
                 left = dailyPoints(ms.filter { it.side == Hand.Left }, metric, false),
                 right = dailyPoints(ms.filter { it.side == Hand.Right }, metric, false),
                 leftColor = c.left, rightColor = c.right,
-                modifier = Modifier.width(130.dp).height(64.dp),
+                modifier = Modifier.width(107.dp).height(52.dp),
             )
         }
     }
@@ -205,33 +205,33 @@ private fun GroupCard(key: GroupKey, ms: List<MeasurementEntity>, modifier: Modi
 private fun SummaryTab(exercise: ExerciseEntity, measurements: List<MeasurementEntity>) {
     val c = measureColors()
     val groups = groupsOf(measurements)
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
         item {
             OutlinedCard {
-                Row(Modifier.padding(20.dp)) {
+                Row(Modifier.padding(16.dp)) {
                     SummaryFigure("Results", "${measurements.size}", Modifier.weight(1f))
                     SummaryFigure("First", measurements.minOfOrNull { it.takenAt }?.let(::shortDate) ?: "—", Modifier.weight(1f))
                     SummaryFigure("Latest", measurements.maxOfOrNull { it.takenAt }?.let(::shortDate) ?: "—", Modifier.weight(1f))
                 }
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(16.dp))
             if (groups.isNotEmpty()) CapsHeader("Personal bests")
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
         }
         if (groups.isEmpty()) item { EmptyNote("Measure ${exercise.name} to see your bests and left–right balance here.") }
         items(groups, key = { it.first.id }) { (key, ms) ->
             val metric = key.type.headline
             val bestL = ms.filter { it.side == Hand.Left }.maxOfOrNull { metric.of(it) }
             val bestR = ms.filter { it.side == Hand.Right }.maxOfOrNull { metric.of(it) }
-            OutlinedCard(Modifier.padding(bottom = 12.dp)) {
-                Column(Modifier.padding(20.dp)) {
+            OutlinedCard(Modifier.padding(bottom = 10.dp)) {
+                Column(Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Dot(key.type.dot)
-                        Spacer(Modifier.width(12.dp))
-                        Text(key.title, style = textStyle(19.sp, FontWeight.SemiBold, c.text), modifier = Modifier.weight(1f))
-                        Text("${ms.size} results", style = textStyle(15.sp, FontWeight.Normal, c.text2))
+                        Spacer(Modifier.width(10.dp))
+                        Text(key.title, style = textStyle(15.5.sp, FontWeight.SemiBold, c.text), modifier = Modifier.weight(1f))
+                        Text("${ms.size} results", style = textStyle(13.5.sp, FontWeight.Normal, c.text2))
                     }
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(13.dp))
                     Row {
                         SummaryFigure("Best left", bestL?.let { "${formatNumber(it, metric.unit)} ${metric.unit}" } ?: "—", Modifier.weight(1f), c.left)
                         SummaryFigure("Best right", bestR?.let { "${formatNumber(it, metric.unit)} ${metric.unit}" } ?: "—", Modifier.weight(1f), c.right)
@@ -248,11 +248,11 @@ private fun SummaryFigure(label: String, value: String, modifier: Modifier = Mod
     val c = measureColors()
     Column(modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            if (dot != null) { Dot(dot, 8.dp); Spacer(Modifier.width(6.dp)) }
-            Text(label, style = textStyle(14.sp, FontWeight.Normal, c.text2))
+            if (dot != null) { Dot(dot, 7.dp); Spacer(Modifier.width(5.dp)) }
+            Text(label, style = textStyle(12.5.sp, FontWeight.Normal, c.text2))
         }
-        Spacer(Modifier.height(6.dp))
-        Text(value, style = textStyle(20.sp, FontWeight.SemiBold, c.text))
+        Spacer(Modifier.height(5.dp))
+        Text(value, style = textStyle(16.5.sp, FontWeight.SemiBold, c.text))
     }
 }
 
@@ -265,14 +265,14 @@ private fun HowToTab(exercise: ExerciseEntity, store: MeasureStore) {
         delay(600)
         store.updateExercise(exercise.copy(howTo = text))
     }
-    Column(Modifier.fillMaxSize().padding(20.dp)) {
-        Text("How to", style = textStyle(26.sp, FontWeight.Bold, c.text))
-        Spacer(Modifier.height(6.dp))
-        Text("Your own notes: setup, grip, body position, what to watch for.", style = textStyle(16.sp, FontWeight.Normal, c.text2))
-        Spacer(Modifier.height(16.dp))
-        Box(Modifier.fillMaxWidth().heightIn(min = 220.dp).clip(RoundedCornerShape(20.dp)).background(c.raised).padding(18.dp)) {
-            if (text.isEmpty()) Text("e.g. Strap on the wrist, elbow locked, raise to shoulder height…", style = textStyle(17.sp, FontWeight.Normal, c.text3))
-            BasicTextField(text, { text = it }, textStyle = textStyle(17.sp, FontWeight.Normal, c.text),
+    Column(Modifier.fillMaxSize().padding(16.dp)) {
+        Text("How to", style = textStyle(21.5.sp, FontWeight.Bold, c.text))
+        Spacer(Modifier.height(5.dp))
+        Text("Your own notes: setup, grip, body position, what to watch for.", style = textStyle(13.sp, FontWeight.Normal, c.text2))
+        Spacer(Modifier.height(13.dp))
+        Box(Modifier.fillMaxWidth().heightIn(min = 180.dp).clip(RoundedCornerShape(16.dp)).background(c.raised).padding(15.dp)) {
+            if (text.isEmpty()) Text("e.g. Strap on the wrist, elbow locked, raise to shoulder height…", style = textStyle(14.sp, FontWeight.Normal, c.text3))
+            BasicTextField(text, { text = it }, textStyle = textStyle(14.sp, FontWeight.Normal, c.text),
                 cursorBrush = SolidColor(c.blue), modifier = Modifier.fillMaxWidth())
         }
     }
@@ -322,90 +322,90 @@ fun GroupScreen(nav: MeasureNavigator, route: MeasureRoute.Group) {
                 })
             }
             item {
-                Row(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                     Legend("Left", c.left)
-                    Spacer(Modifier.width(14.dp))
+                    Spacer(Modifier.width(11.dp))
                     Legend("Right", c.right)
                     Spacer(Modifier.weight(1f))
-                    Segmented(key.type.metrics, metric, { it.label }, { metric = it }, height = 48.dp, equal = false, fontSize = 13.5.sp)
+                    Segmented(key.type.metrics, metric, { it.label }, { metric = it }, height = 39.dp, equal = false, fontSize = 12.sp)
                 }
-                Text("${metric.label} (${if (usePercent) "%BW" else metric.unit})", style = textStyle(26.sp, FontWeight.Bold, c.text),
-                    modifier = Modifier.padding(start = 20.dp, top = 18.dp, bottom = 8.dp))
+                Text("${metric.label} (${if (usePercent) "%BW" else metric.unit})", style = textStyle(21.5.sp, FontWeight.Bold, c.text),
+                    modifier = Modifier.padding(start = 16.dp, top = 15.dp, bottom = 7.dp))
                 HistoryChart(
                     left = dailyPoints(inRange.filter { it.side == Hand.Left }, metric, usePercent),
                     right = dailyPoints(inRange.filter { it.side == Hand.Right }, metric, usePercent),
                     from = from, to = to, leftColor = c.left, rightColor = c.right,
                     ink = c.text2, grid = c.divider, background = c.bg,
-                    modifier = Modifier.fillMaxWidth().height(300.dp).padding(end = 4.dp),
+                    modifier = Modifier.fillMaxWidth().height(246.dp).padding(end = 4.dp),
                 )
-                Segmented(Range.entries, range, { it.label }, { range = it }, Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp), height = 56.dp)
+                Segmented(Range.entries, range, { it.label }, { range = it }, Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp), height = 46.dp)
             }
             item {
-                Row(Modifier.padding(horizontal = 20.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                     CapsHeader("Latest", Modifier.weight(1f))
-                    if (metric.isForce) Segmented(listOf(false, true), percent, { if (it) "%BW" else "kg" }, { percent = it }, Modifier.width(160.dp), height = 50.dp)
+                    if (metric.isForce) Segmented(listOf(false, true), percent, { if (it) "%BW" else "kg" }, { percent = it }, Modifier.width(131.dp), height = 41.dp)
                 }
-                Text("${if (range == Range.All) "All time" else range.label} · ${metric.label}", style = textStyle(16.sp, FontWeight.Normal, c.text2),
-                    modifier = Modifier.padding(horizontal = 20.dp))
-                Spacer(Modifier.height(20.dp))
-                Row(Modifier.padding(horizontal = 20.dp).height(IntrinsicSize.Min)) {
+                Text("${if (range == Range.All) "All time" else range.label} · ${metric.label}", style = textStyle(13.sp, FontWeight.Normal, c.text2),
+                    modifier = Modifier.padding(horizontal = 16.dp))
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.padding(horizontal = 16.dp).height(IntrinsicSize.Min)) {
                     Hand.entries.forEachIndexed { i, hand ->
-                        if (i > 0) { VerticalDivider(Modifier.fillMaxHeight(), color = c.divider); Spacer(Modifier.width(20.dp)) }
+                        if (i > 0) { VerticalDivider(Modifier.fillMaxHeight(), color = c.divider); Spacer(Modifier.width(16.dp)) }
                         val last = inRange.filter { it.side == hand }.maxByOrNull { it.takenAt }
                         Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Dot(if (hand == Hand.Left) c.left else c.right)
-                                Spacer(Modifier.width(8.dp))
-                                Text(hand.label, style = textStyle(18.sp, FontWeight.Medium, c.text2))
+                                Spacer(Modifier.width(7.dp))
+                                Text(hand.label, style = textStyle(15.sp, FontWeight.Medium, c.text2))
                             }
-                            Spacer(Modifier.height(10.dp))
+                            Spacer(Modifier.height(8.dp))
                             if (last != null) {
                                 val v = metric.of(last)
                                 val bw = last.bodyWeightKg
                                 if (usePercent && bw != null && bw > 0) {
-                                    ValueWithUnit("${(v / bw * 100).roundToInt()}", "%BW", 44.sp, c.text, c.text2)
+                                    ValueWithUnit("${(v / bw * 100).roundToInt()}", "%BW", 36.sp, c.text, c.text2)
                                 } else {
-                                    ValueWithUnit(formatNumber(v, metric.unit), if (usePercent) "kg (no bodyweight)" else metric.unit, 44.sp, c.text, c.text2)
+                                    ValueWithUnit(formatNumber(v, metric.unit), if (usePercent) "kg (no bodyweight)" else metric.unit, 36.sp, c.text, c.text2)
                                 }
-                                Spacer(Modifier.height(6.dp))
-                                Text(longDate(last.takenAt), style = textStyle(16.sp, FontWeight.Normal, c.text3))
+                                Spacer(Modifier.height(5.dp))
+                                Text(longDate(last.takenAt), style = textStyle(13.sp, FontWeight.Normal, c.text3))
                             } else {
-                                Text("—", style = textStyle(44.sp, FontWeight.SemiBold, c.text3))
+                                Text("—", style = textStyle(36.sp, FontWeight.SemiBold, c.text3))
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(30.dp))
-                CapsHeader("History", Modifier.padding(horizontal = 20.dp))
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(25.dp))
+                CapsHeader("History", Modifier.padding(horizontal = 16.dp))
+                Spacer(Modifier.height(7.dp))
             }
             val sessions = inRange.groupBy { it.sessionId }.values.sortedByDescending { s -> s.maxOf { it.takenAt } }
             val byDay = sessions.groupBy { longDate(it.first().takenAt) }
             byDay.forEach { (day, daySessions) ->
                 item(key = "day-$day") {
-                    Text(day, style = textStyle(24.sp, FontWeight.Bold, c.text), modifier = Modifier.padding(start = 20.dp, top = 20.dp, bottom = 6.dp))
+                    Text(day, style = textStyle(19.5.sp, FontWeight.Bold, c.text), modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 5.dp))
                 }
                 items(daySessions, key = { it.first().sessionId }) { session ->
                     Row(Modifier.fillMaxWidth().clickable { nav.push(MeasureRoute.Result(session.first().sessionId)) }
-                        .padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        .padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(session.sortedBy { it.side.ordinal }.joinToString("  ·  ") { m ->
                                 "${m.side.label} ${formatNumber(metric.of(m), metric.unit)} ${metric.unit}"
-                            }, style = textStyle(18.sp, FontWeight.Medium, c.text))
+                            }, style = textStyle(15.sp, FontWeight.Medium, c.text))
                             Spacer(Modifier.height(4.dp))
-                            Text(timeFormat.format(Date(session.first().takenAt)), style = textStyle(15.sp, FontWeight.Normal, c.text3))
+                            Text(timeFormat.format(Date(session.first().takenAt)), style = textStyle(13.5.sp, FontWeight.Normal, c.text3))
                         }
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = c.text2)
                     }
-                    HorizontalDivider(Modifier.padding(horizontal = 20.dp), color = c.divider)
+                    HorizontalDivider(Modifier.padding(horizontal = 16.dp), color = c.divider)
                 }
             }
             if (inRange.isEmpty()) item { EmptyNote("No results in this range.") }
-            item { Spacer(Modifier.height(120.dp)) }
+            item { Spacer(Modifier.height(98.dp)) }
         }
         PrimaryButton("Measure", onClick = {
             nav.handSheet = StartContext(exerciseId = route.exerciseId, type = key.type, seconds = key.seconds.takeIf { it > 0 })
-        }, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(20.dp))
+        }, modifier = Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(16.dp))
     }
 }
 
@@ -413,8 +413,8 @@ fun GroupScreen(nav: MeasureNavigator, route: MeasureRoute.Group) {
 private fun Legend(label: String, color: androidx.compose.ui.graphics.Color) {
     val c = measureColors()
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.width(16.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(color))
-        Spacer(Modifier.width(6.dp))
-        Text(label, style = textStyle(16.sp, FontWeight.Medium, c.text2), textAlign = TextAlign.Start)
+        Box(Modifier.width(13.dp).height(4.dp).clip(RoundedCornerShape(2.dp)).background(color))
+        Spacer(Modifier.width(5.dp))
+        Text(label, style = textStyle(13.sp, FontWeight.Medium, c.text2), textAlign = TextAlign.Start)
     }
 }
