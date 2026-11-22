@@ -17,8 +17,8 @@ const val CF_WORK_SECONDS = 7
 const val CF_REST_SECONDS = 3
 const val CF_TOTAL_SECONDS = CF_REPS * (CF_WORK_SECONDS + CF_REST_SECONDS)
 
-/** Peak: one pull, the most force in it. It starts above the trigger and ends on letting go. */
-const val PEAK_MAX_SECONDS = 15
+/** Peak: as many pulls as you like until Stop; the highest force of any of them counts. */
+const val PEAK_MAX_SECONDS = 600
 const val PEAK_TRIGGER_KG = 1.5
 const val PEAK_RELEASE_FRACTION = 0.25
 const val PEAK_RELEASE_SECONDS = 0.3

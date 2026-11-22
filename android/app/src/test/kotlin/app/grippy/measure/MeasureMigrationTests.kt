@@ -5,6 +5,7 @@ import android.database.sqlite.SQLiteDatabase
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -57,5 +58,27 @@ class MeasureMigrationTests {
         assertEquals(5.0, valueAt(points, 0.5), 1e-9)
         assertEquals(7.0, valueAt(points, 1.5), 1e-9)
         assertEquals(4.0, valueAt(points, 9.0), 1e-9)
+    }
+}
+
+/** Peak keeps going after a pull: every pull is counted, the best one counts, Stop ends it. */
+class PeakPullTests {
+    @Test
+    fun peakCountsEveryPullAndKeepsTheBestUntilStop() = runBlocking {
+        val run = MeasureRun(MeasureRequest(MeasureType.Peak, listOf(Hand.Left), PEAK_MAX_SECONDS, startAfter = 1))
+        val driver = kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.Default) { run.drive(tare = {}, cue = {}) }
+        suspend fun hold(kg: Double, ms: Long) {
+            val end = System.currentTimeMillis() + ms
+            while (System.currentTimeMillis() < end) { run.receive(kg); kotlinx.coroutines.delay(20) }
+        }
+        hold(0.0, 1300) // the countdown
+        hold(10.0, 400); hold(0.0, 600)
+        hold(15.0, 400); hold(0.0, 600)
+        hold(12.0, 400); hold(0.0, 600)
+        run.finishHand()
+        kotlinx.coroutines.withTimeout(3000) { driver.join() }
+        assertEquals(listOf(10.0, 15.0, 12.0), run.pullPeaks.toList())
+        assertEquals(MeasureRun.Stage.Done, run.stage)
+        assertEquals(15.0, MeasureMath.maxKg(run.results.getValue(Hand.Left)), 1e-9)
     }
 }

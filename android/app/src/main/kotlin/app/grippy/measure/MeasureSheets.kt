@@ -332,7 +332,7 @@ fun HandSheet(nav: MeasureNavigator, context: StartContext) {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Passive: starts by itself the moment you pull. Active: counts you in first. " +
-                            "Both stop when you let go and keep the highest force.",
+                            "Then pull as many times as you like; only your best pull counts. Press Stop when you're done.",
                         style = textStyle(13.5.sp, FontWeight.Normal, c.text2),
                     )
                 }

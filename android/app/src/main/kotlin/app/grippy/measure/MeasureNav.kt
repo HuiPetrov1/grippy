@@ -116,10 +116,17 @@ class MeasureRun(val request: MeasureRequest) {
 
     private var recordStart = 0L
 
-    /** Peak has no set length: it records one pull, from the start of the effort to letting go. */
+    /** Peak: each finished pull's highest force this hand, in order. The best of them counts. */
+    val pullPeaks = mutableStateListOf<Double>()
+    /** Peak: the pull in progress, or 0 between pulls. */
+    var currentPullKg by mutableDoubleStateOf(0.0)
+        private set
+    private var finishRequested = false
+
+    /** Peak has no set length: pull as many times as you like until Stop; the best pull counts. */
     val isPeak: Boolean get() = request.type == MeasureType.Peak
 
-    /** The longest a recording can run; Peak usually ends sooner, when the person lets go. */
+    /** The longest a recording can run; Peak runs until Stop, up to this cap. */
     val windowSeconds: Int
         get() = when (request.type) {
             MeasureType.CriticalForce -> CF_TOTAL_SECONDS
@@ -162,6 +169,9 @@ class MeasureRun(val request: MeasureRequest) {
             points.clear()
             peakKg = 0.0
             elapsed = 0.0
+            pullPeaks.clear()
+            currentPullKg = 0.0
+            finishRequested = false
             stage = Stage.Countdown
             tare()
             if (isPeak && request.startAfter == 0) {
@@ -183,6 +193,8 @@ class MeasureRun(val request: MeasureRequest) {
             var wasPulling = true
             var releasedAt: Double? = null
             var end = windowSeconds.toDouble()
+            // Passive starts mid-pull; Active waits for the first one.
+            var inPull = isPeak && request.startAfter == 0
             while (true) {
                 val t = (System.nanoTime() - recordStart) / 1e9
                 elapsed = t.coerceAtMost(windowSeconds.toDouble())
@@ -192,16 +204,31 @@ class MeasureRun(val request: MeasureRequest) {
                     cue(if (wasPulling) Cue.Go else Cue.Rest)
                 }
                 if (isPeak) {
-                    // Done once they let go: force back under a quarter of the peak for a moment.
-                    if (peakKg >= PEAK_TRIGGER_KG && liveKg < max(PEAK_TRIGGER_KG / 2, peakKg * PEAK_RELEASE_FRACTION)) {
-                        val since = releasedAt ?: t.also { releasedAt = it }
-                        if (t - since >= PEAK_RELEASE_SECONDS) { end = t; break }
-                    } else {
-                        releasedAt = null
+                    if (finishRequested) { end = t; break }
+                    // Pulls are counted, never ended on: a pull is over once the force is back under
+                    // a quarter of its peak for a moment, and the next one starts above the trigger.
+                    if (inPull) {
+                        currentPullKg = max(currentPullKg, liveKg)
+                        if (liveKg < max(PEAK_TRIGGER_KG / 2, currentPullKg * PEAK_RELEASE_FRACTION)) {
+                            val since = releasedAt ?: t.also { releasedAt = it }
+                            if (t - since >= PEAK_RELEASE_SECONDS) {
+                                if (currentPullKg >= PEAK_TRIGGER_KG) pullPeaks.add(currentPullKg)
+                                currentPullKg = 0.0
+                                inPull = false
+                                releasedAt = null
+                            }
+                        } else {
+                            releasedAt = null
+                        }
+                    } else if (liveKg >= PEAK_TRIGGER_KG) {
+                        inPull = true
+                        currentPullKg = liveKg
                     }
                 }
                 delay(40)
             }
+            if (isPeak && currentPullKg >= PEAK_TRIGGER_KG) pullPeaks.add(currentPullKg)
+            currentPullKg = 0.0
             points.add(ForcePoint(end, liveKg))
             results[hand] = points.toList()
             cue(Cue.Stop)
@@ -217,6 +244,11 @@ class MeasureRun(val request: MeasureRequest) {
         stage = Stage.Connecting
         started = false
     }
+
+    /** Peak: this hand is done (the person tapped Stop); the next hand, or the result, follows. */
+    fun finishHand() { finishRequested = true }
+
+    val isLastHand: Boolean get() = handIndex >= request.hands.lastIndex
 
     /** Skips ahead to the result with what was recorded so far (the person tapped Stop). */
     fun stopEarly() {

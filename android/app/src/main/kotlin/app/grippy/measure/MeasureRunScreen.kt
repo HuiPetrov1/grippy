@@ -9,6 +9,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -142,7 +143,12 @@ fun MeasureRunScreen(nav: MeasureNavigator, run: MeasureRun) {
         }
         Column(Modifier.navigationBarsPadding().padding(16.dp)) {
             if (run.stage == MeasureRun.Stage.Recording) {
-                SecondaryButton(if (run.isPeak) "Done" else "Stop", onClick = { run.stopEarly() })
+                if (run.isPeak) {
+                    PrimaryButton(if (run.isLastHand) "Stop" else "Stop · next: ${run.request.hands[run.handIndex + 1].label.lowercase()} hand",
+                        onClick = { run.finishHand() })
+                } else {
+                    SecondaryButton("Stop", onClick = { run.stopEarly() })
+                }
             } else {
                 SecondaryButton("Cancel", onClick = { nav.pop() })
             }
@@ -205,29 +211,50 @@ private fun Waiting(run: MeasureRun) {
     Spacer(Modifier.height(10.dp))
     Text("Pull when you're ready", style = textStyle(26.sp, FontWeight.Bold, c.text), textAlign = TextAlign.Center)
     Spacer(Modifier.height(8.dp))
-    Text("It starts when you pull and stops when you let go.", style = textStyle(14.sp, FontWeight.Normal, c.text2),
+    Text("It starts when you pull. Pull as many times as you like, then press Stop.", style = textStyle(14.sp, FontWeight.Normal, c.text2),
         textAlign = TextAlign.Center)
     Spacer(Modifier.height(30.dp))
     Text("Scale reads ${formatKg(run.liveKg)} kg", style = textStyle(14.sp, FontWeight.Medium, c.text3))
 }
 
-/** Peak: the most force in one pull. The peak is the big number; it ends when they let go. */
+/** Peak: pull as often as you like; the best pull is the big number, each pull a chip. */
 @Composable
 private fun PeakRecording(run: MeasureRun) {
     val c = measureColors()
     val handColor = if (run.hand == Hand.Left) c.left else c.right
+    val best = run.pullPeaks.maxOrNull()
     Spacer(Modifier.height(13.dp))
     HandBadge(run.hand)
     Spacer(Modifier.height(13.dp))
-    Text("Pull as hard as you can!", style = textStyle(20.sp, FontWeight.SemiBold, c.text2))
-    Text("PEAK", style = textStyle(14.sp, FontWeight.SemiBold, c.text3, 1.sp), modifier = Modifier.padding(top = 10.dp))
+    Text(if (run.currentPullKg > 0) "Pull ${run.pullPeaks.size + 1} · keep pulling!" else if (run.pullPeaks.isEmpty()) "Pull as hard as you can!" else "Rest, then try to beat it",
+        style = textStyle(20.sp, FontWeight.SemiBold, c.text2))
+    Text("BEST", style = textStyle(14.sp, FontWeight.SemiBold, c.text3, 1.sp), modifier = Modifier.padding(top = 10.dp))
     ValueWithUnit(formatKg(run.peakKg), "kg", 85.sp, c.text, c.text2)
-    Text("Now ${formatKg(run.liveKg)} kg · ${"%.1f".format(run.elapsed)} s", style = textStyle(15.sp, FontWeight.Medium, c.text2))
-    Spacer(Modifier.height(20.dp))
-    val window = maxOf(5, ceil(run.elapsed + 1).toInt())
-    LiveCurve(run.points.toList(), window, handColor, c.divider, Modifier.fillMaxWidth().height(164.dp))
+    Text(
+        (if (run.currentPullKg > 0) "This pull ${formatKg(run.currentPullKg)} kg · " else "") + "Now ${formatKg(run.liveKg)} kg",
+        style = textStyle(15.sp, FontWeight.Medium, c.text2),
+    )
     Spacer(Modifier.height(12.dp))
-    Text("Stops by itself when you let go", style = textStyle(13.5.sp, FontWeight.Normal, c.text3))
+    if (run.pullPeaks.isNotEmpty()) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
+            run.pullPeaks.forEachIndexed { i, kg ->
+                val top = kg == best
+                Row(Modifier.clip(CircleShape).background(if (top) c.blueWash else c.raised).padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text("${i + 1}", style = textStyle(12.sp, FontWeight.SemiBold, c.text3))
+                    Spacer(Modifier.width(6.dp))
+                    Text("${formatKg(kg)} kg", style = textStyle(14.sp, FontWeight.SemiBold, if (top) c.link else c.text))
+                    if (top) Text(" ★", style = textStyle(13.sp, FontWeight.SemiBold, c.link))
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+    }
+    val window = maxOf(10, ceil(run.elapsed + 1).toInt())
+    LiveCurve(run.points.toList(), window, handColor, c.divider, Modifier.fillMaxWidth().height(150.dp))
+    Spacer(Modifier.height(10.dp))
+    Text("${"%.0f".format(run.elapsed)} s · only your best pull counts. Press Stop when you're done.",
+        style = textStyle(13.5.sp, FontWeight.Normal, c.text3), textAlign = TextAlign.Center)
 }
 
 @Composable
