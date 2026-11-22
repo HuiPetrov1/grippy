@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -76,57 +77,17 @@ private val CardBlue = Color(0xFF0A84FF)
 private val CardLine = Color.White.copy(alpha = .32f)
 private val CardSoft = Color.White.copy(alpha = .82f)
 
-@Composable
-fun ResultScreen(nav: MeasureNavigator, route: MeasureRoute.Result) {
-    val c = measureColors()
-    val store = rememberMeasureStore()
-    val data = store.collect()
-    val session = data.session(route.sessionId)
-    val exercise = session.firstOrNull()?.let { data.exercise(it.exerciseId) }
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var deleting by remember { mutableStateOf(false) }
-    BackHandler { nav.pop() }
-    val layers = session.map { it.id to rememberGraphicsLayer() }.toMap()
-
-    Column(Modifier.fillMaxSize().background(c.bg)) {
-        TopBar(exercise?.name ?: "Result", onBack = { nav.pop() }, actions = {
-            IconButton(onClick = {
-                scope.launch {
-                    val bitmaps = session.mapNotNull { m -> layers[m.id]?.toImageBitmap()?.asAndroidBitmap()?.let { m to it } }
-                    shareCards(context, bitmaps)
-                }
-            }, enabled = session.isNotEmpty()) { Icon(Icons.Outlined.Share, "Share", tint = c.text) }
-            IconButton(onClick = { deleting = true }, enabled = session.isNotEmpty()) { Icon(Icons.Outlined.Delete, "Delete", tint = c.text) }
-        })
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            session.forEach { m ->
-                ScaledCard(layers.getValue(m.id)) { ResultCard(m, exercise?.name ?: "") }
-            }
-            if (session.isEmpty()) EmptyNote("This result was deleted.")
-            Spacer(Modifier.navigationBarsPadding().height(10.dp))
-        }
-    }
-    if (deleting) {
-        AlertDialog(
-            onDismissRequest = { deleting = false },
-            title = { Text("Delete this result?") },
-            text = { Text(if (session.size > 1) "Both hands' readings are deleted. This can't be undone." else "This can't be undone.") },
-            confirmButton = { TextButton(onClick = { deleting = false; nav.pop(); store.deleteSession(route.sessionId) }) { Text("Delete") } },
-            dismissButton = { TextButton(onClick = { deleting = false }) { Text("Cancel") } },
-        )
-    }
-}
-
 /** Lays the 360 × 450 dp card out at its design size, scales it to the width, and records it for sharing. */
 @Composable
-private fun ScaledCard(layer: GraphicsLayer, content: @Composable () -> Unit) {
+internal fun ScaledCard(layer: GraphicsLayer, content: @Composable () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val scale = maxWidth / CARD_WIDTH
         Box(Modifier.fillMaxWidth().height(CARD_HEIGHT * scale).clip(RoundedCornerShape(24.dp)), contentAlignment = Alignment.TopStart) {
             Box(
-                Modifier.requiredSize(CARD_WIDTH, CARD_HEIGHT)
+                // Unbounded and pinned top-left: a 360 dp card on a narrower phone would otherwise be
+                // centred (half of it off the left edge) before the scale pulls it back in.
+                Modifier.wrapContentSize(Alignment.TopStart, unbounded = true)
+                    .requiredSize(CARD_WIDTH, CARD_HEIGHT)
                     .graphicsLayer {
                         scaleX = scale; scaleY = scale
                         transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
@@ -256,7 +217,7 @@ private fun CardValue(value: String, unit: String, size: androidx.compose.ui.uni
 @Composable private fun HLine() = Box(Modifier.fillMaxWidth().height(1.dp).background(CardLine))
 @Composable private fun RowScope.VLine() = Box(Modifier.width(1.dp).fillMaxHeight().background(CardLine))
 
-private suspend fun shareCards(context: Context, cards: List<Pair<MeasurementEntity, Bitmap>>) {
+internal suspend fun shareCards(context: Context, cards: List<Pair<MeasurementEntity, Bitmap>>) {
     if (cards.isEmpty()) return
     val uris = withContext(Dispatchers.IO) {
         val dir = File(context.cacheDir, "shared").apply { mkdirs() }

@@ -144,7 +144,7 @@ enum class Tab(private val key: String, val icon: ImageVector, val selectedIcon:
 }
 
 /// Grippy: the pages Home pushes over the tabs.
-enum class HomePage { Settings, Benchmarks }
+enum class HomePage { Settings, Benchmarks, WorkoutLog }
 
 /// The SOFT NUDGE: once the newest measured max is four weeks stale the Maxes icon pulses
 /// (Nuri, 2026-08-10). No badge, no notification; someone who never measured is never nudged.
@@ -379,6 +379,7 @@ fun RootTabView() {
                     onCriticalForce = ::openCriticalForce,
                     onBack = { homePage = null },
                 )
+                HomePage.WorkoutLog -> HistoryScreen(onLogSession = { loggingSession = true }, onBack = { homePage = null })
             }
         }
         if (loggingSession) SessionLogSheet(onClose = { loggingSession = false })
@@ -438,7 +439,7 @@ fun RootTabView() {
                     canPresentImport = !loggingSession,
                 )
                 Tab.Measure -> MeasureTabScreen(measureNav, onLiveData = { liveGauge = true })
-                Tab.History -> HistoryScreen(onLogSession = { loggingSession = true })
+                Tab.History -> app.grippy.measure.GrippyHistoryScreen(measureNav, onWorkoutLog = { homePage = HomePage.WorkoutLog })
             }
         }
         }

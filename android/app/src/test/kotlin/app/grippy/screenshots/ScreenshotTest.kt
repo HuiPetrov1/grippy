@@ -156,6 +156,15 @@ class ScreenshotTest(private val theme: String) {
 
     @Test fun history() { tabTap("History"); shoot("03-history") }
 
+    @Test fun historyDay() { tabTap("History"); tap("supinated front raise"); shoot("03b-history-day") }
+
+    @Test fun historyAnalytics() {
+        tabTap("History")
+        compose.onNodeWithText("Analytics").performClick()
+        settle()
+        shoot("03c-history-analytics")
+    }
+
     @Test fun measureTab() { tabTap("Measure"); shoot("11-measure") }
 
     @Test fun exercise() { tabTap("Measure"); tap("supinated front raise"); shoot("12-exercise") }
@@ -165,6 +174,15 @@ class ScreenshotTest(private val theme: String) {
     @Test fun group() { tabTap("Measure"); tap("supinated front raise"); tap("Endurance 10 s"); shoot("13-group") }
 
     @Test fun result() { tap("Endurance 15 s"); shoot("14-result") }
+
+    @Test fun resultBoth() { tap("Endurance 10 s"); shoot("14b-result-both") }
+
+    @Test fun resultShareCard() {
+        tap("Endurance 10 s")
+        compose.onNodeWithText("Share both cards").performScrollTo()
+        settle()
+        shoot("14c-result-card")
+    }
 
     @Test fun startSheet() {
         tabTap("Measure")

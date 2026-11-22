@@ -18,7 +18,11 @@ changes merge cleanly.
 - No Google Play rating prompt and no support mail to the upstream maintainer.
 - CI runs the Android job only.
 - Frez-style tabs: **Home**, **Workout** (Get a Grip's routines), **Measure**, **History**.
-  Settings and Benchmarks open from Home.
+  Settings and Benchmarks open from Home. History is a swipeable month calendar of
+  measurements, workouts and scheduled measurements (tap a day for its records, + Record,
+  + Schedule), plus Analytics (activity, types, per-exercise trends). Get a Grip's own workout
+  history is the "Workout log" inside Analytics. Results open as an interactive page: a
+  scrubbable force curve, numbers counting in, left/right balance, and the share card.
 - A **Measure** section for any exercise, not just climbing
   (`android/app/src/main/kotlin/app/grippy/measure/`). Pick Peak, Endurance, Critical Force
   (24 × 7 s/3 s) or RFD, then the hands, duration and countdown. Peak has no duration: it

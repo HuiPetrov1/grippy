@@ -157,10 +157,10 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
 
 /** A secondary full-width button on the raised grey. */
 @Composable
-fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color? = null) {
+fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier, color: Color? = null, background: Color? = null) {
     val c = measureColors()
     Box(
-        modifier.fillMaxWidth().height(46.dp).clip(CircleShape).background(c.raised).clickable(onClick = onClick),
+        modifier.fillMaxWidth().height(48.dp).clip(CircleShape).background(background ?: c.raised).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Text(text, style = textStyle(14.sp, FontWeight.SemiBold, color ?: c.text))

@@ -152,7 +152,7 @@ private fun DrawScope.series(
 }
 
 /** Round, readable gridlines for a value range. */
-private fun niceTicks(lo: Double, hi: Double, count: Int = 4): List<Double> {
+internal fun niceTicks(lo: Double, hi: Double, count: Int = 4): List<Double> {
     val span = (hi - lo).takeIf { it > 0 } ?: max(1.0, hi)
     val raw = span / count
     val mag = 10.0.pow(floor(log10(raw)))

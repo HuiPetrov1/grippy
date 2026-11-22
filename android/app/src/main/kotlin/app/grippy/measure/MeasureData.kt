@@ -21,6 +21,8 @@ import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -96,6 +98,31 @@ data class MeasurementEntity(
     }
 }
 
+/** Something planned for a day: a measurement type, maybe for an exercise. */
+@Entity(tableName = "plans")
+data class PlanEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    /** `LocalDate.toEpochDay()`. */
+    val epochDay: Long,
+    val type: String,
+    val exerciseId: Long? = null,
+    val note: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+) {
+    val measureType: MeasureType get() = MeasureType.of(type)
+}
+
+/** Version 2 adds the plans table; nothing measured before is touched. */
+val MEASURE_MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `plans` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "`epochDay` INTEGER NOT NULL, `type` TEXT NOT NULL, `exerciseId` INTEGER, " +
+                "`note` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+        )
+    }
+}
+
 @Dao
 interface MeasureDao {
     @Query("SELECT * FROM folders ORDER BY createdAt")
@@ -106,6 +133,12 @@ interface MeasureDao {
 
     @Query("SELECT * FROM measurements ORDER BY takenAt")
     fun measurements(): Flow<List<MeasurementEntity>>
+
+    @Query("SELECT * FROM plans ORDER BY epochDay, createdAt")
+    fun plans(): Flow<List<PlanEntity>>
+
+    @Insert suspend fun insert(plan: PlanEntity): Long
+    @Query("DELETE FROM plans WHERE id = :id") suspend fun deletePlan(id: Long)
 
     @Insert suspend fun insert(folder: FolderEntity): Long
     @Insert suspend fun insert(exercise: ExerciseEntity): Long
@@ -121,8 +154,8 @@ interface MeasureDao {
 }
 
 @Database(
-    entities = [FolderEntity::class, ExerciseEntity::class, MeasurementEntity::class],
-    version = 1,
+    entities = [FolderEntity::class, ExerciseEntity::class, MeasurementEntity::class, PlanEntity::class],
+    version = 2,
     exportSchema = false,
 )
 abstract class MeasureDatabase : RoomDatabase() {
@@ -140,6 +173,11 @@ class MeasureStore(private val db: MeasureDatabase) {
         dao.exercises().stateIn(scope, SharingStarted.Eagerly, emptyList())
     val measurements: StateFlow<List<MeasurementEntity>> =
         dao.measurements().stateIn(scope, SharingStarted.Eagerly, emptyList())
+    val plans: StateFlow<List<PlanEntity>> =
+        dao.plans().stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+    fun addPlan(plan: PlanEntity) = scope.launch { dao.insert(plan) }
+    fun deletePlan(id: Long) = scope.launch { dao.deletePlan(id) }
 
     fun addFolder(name: String) = scope.launch { dao.insert(FolderEntity(name = name.trim())) }
 
@@ -177,7 +215,7 @@ object MeasureStores {
         val builder = if (Build.FINGERPRINT == "robolectric") {
             Room.inMemoryDatabaseBuilder(app, MeasureDatabase::class.java).allowMainThreadQueries()
         } else {
-            Room.databaseBuilder(app, MeasureDatabase::class.java, "grippy-measure.db")
+            Room.databaseBuilder(app, MeasureDatabase::class.java, "grippy-measure.db").addMigrations(MEASURE_MIGRATION_1_2)
         }
         return MeasureStore(builder.build()).also { store = it; owner = app }
     }
@@ -194,6 +232,7 @@ class MeasureSnapshot(
     val folders: List<FolderEntity>,
     val exercises: List<ExerciseEntity>,
     val measurements: List<MeasurementEntity>,
+    val plans: List<PlanEntity> = emptyList(),
 ) {
     fun exercise(id: Long): ExerciseEntity? = exercises.firstOrNull { it.id == id }
     fun of(exerciseId: Long): List<MeasurementEntity> = measurements.filter { it.exerciseId == exerciseId }
@@ -206,5 +245,6 @@ fun MeasureStore.collect(): MeasureSnapshot {
     val folders by folders.collectAsState()
     val exercises by exercises.collectAsState()
     val measurements by measurements.collectAsState()
-    return remember(folders, exercises, measurements) { MeasureSnapshot(folders, exercises, measurements) }
+    val plans by plans.collectAsState()
+    return remember(folders, exercises, measurements, plans) { MeasureSnapshot(folders, exercises, measurements, plans) }
 }

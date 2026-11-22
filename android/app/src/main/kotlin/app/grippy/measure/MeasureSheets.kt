@@ -3,6 +3,9 @@
 
 package app.grippy.measure
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,6 +60,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -69,7 +73,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MeasureSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
+internal fun MeasureSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {
     val c = measureColors()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -341,13 +345,10 @@ fun HandSheet(nav: MeasureNavigator, context: StartContext) {
             }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 HandCard("Both", hands = 2, selected = left && right, showCheck = false, Modifier.weight(1f)) { left = true; right = true }
-                HandCard("Left", hands = 1, selected = left, showCheck = true, Modifier.weight(1f)) {
-                    if (left && !right) return@HandCard
-                    left = !left
-                }
-                HandCard("Right", hands = 1, selected = right, showCheck = true, Modifier.weight(1f), mirror = true) {
-                    if (right && !left) return@HandCard
-                    right = !right
+                // One choice at a time: Left is left only, Right is right only, Both is both.
+                HandCard("Left", hands = 1, selected = left && !right, showCheck = true, Modifier.weight(1f)) { left = true; right = false }
+                HandCard("Right", hands = 1, selected = right && !left, showCheck = true, Modifier.weight(1f), mirror = true) {
+                    left = false; right = true
                 }
             }
             Spacer(Modifier.height(12.dp))
@@ -357,8 +358,8 @@ fun HandSheet(nav: MeasureNavigator, context: StartContext) {
                 Text(
                     when {
                         left && right -> "Left first, then right."
-                        left -> "Only the left side is measured.\nTap right to add it."
-                        else -> "Only the right side is measured.\nTap left to add it."
+                        left -> "Only the left side is measured.\nPick Both to measure both sides."
+                        else -> "Only the right side is measured.\nPick Both to measure both sides."
                     },
                     style = textStyle(14.sp, FontWeight.Normal, c.text),
                 )
@@ -429,11 +430,14 @@ private fun HandCard(
 ) {
     val c = measureColors()
     val shape = RoundedCornerShape(18.dp)
-    val ink = if (selected) c.link else c.text
+    val ink by animateColorAsState(if (selected) c.link else c.text, label = "ink")
+    val fill by animateColorAsState(if (selected) c.blueWash else c.raisedHigh, label = "fill")
+    val edge by animateColorAsState(if (selected) c.link else c.raisedHigh, label = "edge")
+    val press by animateFloatAsState(if (selected) 1f else .97f, spring(dampingRatio = .5f, stiffness = 500f), label = "press")
     Box(
-        modifier.height(88.dp).clip(shape)
-            .background(if (selected) c.blueWash else c.raisedHigh)
-            .border(if (selected) 2.dp else 0.dp, if (selected) c.link else Color.Transparent, shape)
+        modifier.height(88.dp).graphicsLayer { scaleX = press; scaleY = press }.clip(shape)
+            .background(fill)
+            .border(2.dp, edge, shape)
             .clickable(onClick = onClick),
     ) {
         Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {

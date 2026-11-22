@@ -1,0 +1,61 @@
+// SPDX-License-Identifier: MPL-2.0
+package app.grippy.measure
+
+import android.database.sqlite.SQLiteDatabase
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import java.time.LocalDate
+
+/** A phone that measured on version 1 keeps everything when the plans table arrives. */
+@RunWith(RobolectricTestRunner::class)
+class MeasureMigrationTests {
+    @Test
+    fun version1DatabaseUpgradesWithItsDataAndTakesPlans() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+        val file = context.getDatabasePath("migration-test.db").apply { parentFile?.mkdirs(); delete() }
+        SQLiteDatabase.openOrCreateDatabase(file, null).use { db ->
+            db.execSQL("CREATE TABLE IF NOT EXISTS `folders` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS `exercises` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `folderId` INTEGER, `howTo` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS `measurements` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `exerciseId` INTEGER NOT NULL, `sessionId` TEXT NOT NULL, `type` TEXT NOT NULL, `hand` TEXT NOT NULL, `durationSec` INTEGER NOT NULL, `takenAt` INTEGER NOT NULL, `samples` TEXT NOT NULL, `maxKg` REAL NOT NULL, `minKg` REAL NOT NULL, `avgKg` REAL NOT NULL, `impulse` REAL NOT NULL, `rfd` REAL NOT NULL, `cfKg` REAL NOT NULL, `bodyWeightKg` REAL)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_measurements_exerciseId` ON `measurements` (`exerciseId`)")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_measurements_sessionId` ON `measurements` (`sessionId`)")
+            db.execSQL("INSERT INTO exercises (name, folderId, howTo, createdAt) VALUES ('supinated front raise', NULL, '', 1)")
+            db.execSQL("INSERT INTO measurements (exerciseId, sessionId, type, hand, durationSec, takenAt, samples, maxKg, minKg, avgKg, impulse, rfd, cfKg, bodyWeightKg) " +
+                "VALUES (1, 's1', 'endurance', 'left', 10, 1000, '0.00,1.00', 6.0, 1.0, 5.0, 50.0, 10.0, 0.0, NULL)")
+            db.version = 1
+        }
+        val room = Room.databaseBuilder(context, MeasureDatabase::class.java, "migration-test.db")
+            .addMigrations(MEASURE_MIGRATION_1_2).allowMainThreadQueries().build()
+        try {
+            val dao = room.dao()
+            assertEquals(listOf("supinated front raise"), dao.exercises().first().map { it.name })
+            assertEquals(1, dao.measurements().first().size)
+            dao.insert(PlanEntity(epochDay = LocalDate.of(2026, 11, 26).toEpochDay(), type = "peak", exerciseId = 1))
+            assertEquals(1, dao.plans().first().size)
+        } finally {
+            room.close()
+            file.delete()
+        }
+    }
+
+    @Test
+    fun bestStreakCountsTheLongestRunOfDays() {
+        val d = LocalDate.of(2026, 11, 1)
+        assertEquals(3, bestStreak(setOf(d, d.plusDays(1), d.plusDays(2), d.plusDays(5), d.plusDays(6))))
+        assertEquals(0, bestStreak(emptySet()))
+    }
+
+    @Test
+    fun valueAtInterpolatesBetweenReadings() {
+        val points = listOf(ForcePoint(0.0, 0.0), ForcePoint(1.0, 10.0), ForcePoint(2.0, 4.0))
+        assertEquals(5.0, valueAt(points, 0.5), 1e-9)
+        assertEquals(7.0, valueAt(points, 1.5), 1e-9)
+        assertEquals(4.0, valueAt(points, 9.0), 1e-9)
+    }
+}

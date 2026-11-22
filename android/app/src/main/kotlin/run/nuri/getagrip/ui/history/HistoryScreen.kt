@@ -136,6 +136,8 @@ fun HistoryScreen(
     onLogSession: () -> Unit,
     modifier: Modifier = Modifier,
     feed: HistoryFeed = LocalHistoryFeed.current,
+    /** Grippy: the workout log opens from the History tab's Analytics, with a way back. */
+    onBack: (() -> Unit)? = null,
 ) {
     val templates = LocalTemplateStore.current
     val clock = LocalDayClock.current
@@ -158,6 +160,7 @@ fun HistoryScreen(
         ) {
             composable(ROUTE_HISTORY) { entry ->
                 HistoryRoot(
+                    onBack = onBack,
                     onLogSession = onLogSession,
                     feed = feed,
                     onExport = { exportRequest = it },
@@ -227,6 +230,7 @@ private const val ROUTE_SESSION = "session"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HistoryRoot(
+    onBack: (() -> Unit)?,
     onLogSession: () -> Unit,
     feed: HistoryFeed,
     onExport: (AnalysisExportRequest) -> Unit,
@@ -266,7 +270,8 @@ private fun HistoryRoot(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             LargeTopAppBar(
-                title = { Text(tr("History")) },
+                title = { Text(tr("Workout log")) },
+                navigationIcon = { if (onBack != null) app.grippy.measure.BackButton(onBack) },
                 scrollBehavior = scrollBehavior,
                 windowInsets = WindowInsets(0, 0, 0, 0),
                 colors = TopAppBarDefaults.topAppBarColors(
