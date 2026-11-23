@@ -23,7 +23,7 @@ CODE=$(( ( $(date +%s) - 1767225600 ) / 60 ))
 NAME="0.1.$CODE"
 
 cd "$ROOT/android"
-nice -n 19 ionice -c3 ./gradlew :app:assembleRelease \
+nice -n 19 ionice -c3 ./gradlew :app:assembleRelease ${GRIPPY_GRADLE_ARGS:-} \
   -Pgetagrip.versionCode="$CODE" -Pgetagrip.versionName="$NAME" --console=plain -q
 
 OUT="$(mktemp -d)"
