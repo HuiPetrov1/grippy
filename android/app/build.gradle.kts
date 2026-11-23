@@ -60,6 +60,9 @@ android {
         applicationId = "app.grippy"
         minSdk = 31
         targetSdk = 36
+        // Grippy: the hand-tracking library is 16 MB of native code per processor type. Every phone
+        // this runs on is 64-bit ARM, so only that one is packed.
+        ndk { abiFilters += "arm64-v8a" }
         // **THE VERSION LIVES IN `gradle.properties`,** not here: an upload to Play is
         // rejected outright for a `versionCode` that is not strictly greater than the last
         // one, and a number buried in a build script is a number somebody forgets to bump.
@@ -117,6 +120,9 @@ android {
             signingConfig = signingConfigs.findByName("upload") ?: signingConfigs.getByName("debug")
         }
     }
+
+    // Grippy: the hand model is read straight out of the APK, which needs it stored uncompressed.
+    androidResources { noCompress += "task" }
 
     testOptions {
         unitTests {
@@ -224,6 +230,14 @@ dependencies {
     // The settings surface: the gauge kind `DeviceStore` reads before its first client
     // exists, plus everything `SettingsStore` grew for the store layer.
     implementation(libs.datastore.preferences)
+
+    // Grippy, camera phone: CameraX for the live frames, and MediaPipe's hand model (Apache-2.0,
+    // runs on the phone; the model file is app/src/main/assets/hand_landmarker.task).
+    implementation("androidx.camera:camera-core:1.7.0")
+    implementation("androidx.camera:camera-camera2:1.7.0")
+    implementation("androidx.camera:camera-lifecycle:1.7.0")
+    implementation("androidx.camera:camera-view:1.7.0")
+    implementation("com.google.mediapipe:tasks-vision:1.2.3")
 
     // Both encoding and camera decoding run locally using Apache-licensed ZXing.
     implementation(libs.zxing.core)

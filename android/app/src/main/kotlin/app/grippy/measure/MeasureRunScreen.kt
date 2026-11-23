@@ -167,7 +167,7 @@ fun MeasureRunScreen(nav: MeasureNavigator, run: MeasureRun) {
 }
 
 @Composable
-private fun HandBadge(hand: Hand) {
+internal fun HandBadge(hand: Hand) {
     val c = measureColors()
     Row(Modifier.clip(CircleShape).background(c.raised).padding(horizontal = 13.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
         Dot(if (hand == Hand.Left) c.left else c.right, 8.dp)
@@ -345,40 +345,7 @@ fun MeasureReviewScreen(nav: MeasureNavigator, run: MeasureRun) {
                 }
             }
             Spacer(Modifier.height(23.dp))
-            if (preset != null) {
-                Text("Exercise", style = textStyle(15.5.sp, FontWeight.SemiBold, c.text))
-                Spacer(Modifier.height(8.dp))
-                ExerciseRow(preset, data.of(preset.id)) {}
-            } else {
-                Text("Pick the exercise", style = textStyle(15.5.sp, FontWeight.SemiBold, c.text))
-                Spacer(Modifier.height(10.dp))
-                Row(Modifier.fillMaxWidth().height(49.dp).clip(RoundedCornerShape(15.dp)).background(c.raised).padding(horizontal = 15.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f)) {
-                        if (newName.isEmpty()) Text("New exercise, e.g. supinated front raise", style = textStyle(14.sp, FontWeight.Normal, c.text3),
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        BasicTextField(newName, { newName = it; if (it.isNotBlank()) picked = null }, singleLine = true,
-                            textStyle = textStyle(14.sp, FontWeight.Normal, c.text), cursorBrush = SolidColor(c.blue),
-                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
-                            modifier = Modifier.fillMaxWidth())
-                    }
-                }
-                if (data.exercises.isNotEmpty()) {
-                    Spacer(Modifier.height(13.dp))
-                    OutlinedCard {
-                        data.exercises.sortedByDescending { e -> data.of(e.id).maxOfOrNull { it.takenAt } ?: e.createdAt }.forEachIndexed { i, e ->
-                            Row(Modifier.fillMaxWidth().clickable { picked = e.id; newName = "" }.padding(horizontal = 10.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically) {
-                                RadioButton(picked == e.id, onClick = { picked = e.id; newName = "" },
-                                    colors = RadioButtonDefaults.colors(selectedColor = c.blue, unselectedColor = c.text3))
-                                Spacer(Modifier.width(7.dp))
-                                Text(e.name, style = textStyle(14.sp, FontWeight.Medium, c.text), modifier = Modifier.weight(1f))
-                            }
-                            if (i < data.exercises.lastIndex) HorizontalDivider(Modifier.padding(start = 52.dp), color = c.divider)
-                        }
-                    }
-                }
-            }
+            ExerciseChooser(data, preset, picked, newName, onPick = { picked = it; newName = "" }, onName = { newName = it; if (it.isNotBlank()) picked = null })
             Spacer(Modifier.height(20.dp))
         }
         Column(Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -410,8 +377,53 @@ fun MeasureReviewScreen(nav: MeasureNavigator, run: MeasureRun) {
     }
 }
 
+/** "Which exercise is this?": the preset one, or a new name, or one from the list. */
 @Composable
-private fun StatLine(label: String, value: String) {
+fun ExerciseChooser(
+    data: MeasureSnapshot, preset: ExerciseEntity?, picked: Long?, newName: String,
+    onPick: (Long) -> Unit, onName: (String) -> Unit,
+) {
+    val c = measureColors()
+    Column {
+        if (preset != null) {
+            Text("Exercise", style = textStyle(15.5.sp, FontWeight.SemiBold, c.text))
+            Spacer(Modifier.height(8.dp))
+            ExerciseRow(preset, data.of(preset.id)) {}
+        } else {
+            Text("Pick the exercise", style = textStyle(15.5.sp, FontWeight.SemiBold, c.text))
+            Spacer(Modifier.height(10.dp))
+            Row(Modifier.fillMaxWidth().height(49.dp).clip(RoundedCornerShape(15.dp)).background(c.raised).padding(horizontal = 15.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f)) {
+                    if (newName.isEmpty()) Text("New exercise, e.g. supinated front raise", style = textStyle(14.sp, FontWeight.Normal, c.text3),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    BasicTextField(newName, onName, singleLine = true,
+                        textStyle = textStyle(14.sp, FontWeight.Normal, c.text), cursorBrush = SolidColor(c.blue),
+                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None),
+                        modifier = Modifier.fillMaxWidth())
+                }
+            }
+            if (data.exercises.isNotEmpty()) {
+                Spacer(Modifier.height(13.dp))
+                OutlinedCard {
+                    data.exercises.sortedByDescending { e -> data.of(e.id).maxOfOrNull { it.takenAt } ?: e.createdAt }.forEachIndexed { i, e ->
+                        Row(Modifier.fillMaxWidth().clickable { onPick(e.id) }.padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically) {
+                            RadioButton(picked == e.id, onClick = { onPick(e.id) },
+                                colors = RadioButtonDefaults.colors(selectedColor = c.blue, unselectedColor = c.text3))
+                            Spacer(Modifier.width(7.dp))
+                            Text(e.name, style = textStyle(14.sp, FontWeight.Medium, c.text), modifier = Modifier.weight(1f))
+                        }
+                        if (i < data.exercises.lastIndex) HorizontalDivider(Modifier.padding(start = 52.dp), color = c.divider)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun StatLine(label: String, value: String) {
     val c = measureColors()
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         Text(label, style = textStyle(12.5.sp, FontWeight.Normal, c.text2), modifier = Modifier.weight(1f))

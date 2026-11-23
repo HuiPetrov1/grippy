@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
@@ -70,8 +71,23 @@ data class MeasurementEntity(
     val rfd: Double,
     val cfKg: Double,
     val bodyWeightKg: Double?,
+    /** Camera-counted reps (0 for anything measured with the scale). */
+    @ColumnInfo(defaultValue = "0") val reps: Int = 0,
+    /** Each rep as `finishedMs:tookMs:range%`, joined by `;` — see [RepMarks]. */
+    @ColumnInfo(defaultValue = "") val repMarks: String = "",
 ) {
     val measureType: MeasureType get() = MeasureType.of(type)
+    val marks: List<app.grippy.camera.RepMark> get() = RepMarks.decode(repMarks)
+    /** Seconds per rep: the average of the reps the camera timed, else the whole set shared out. */
+    val tempoSec: Double
+        get() {
+            val timed = marks.filter { it.durationMs > 0 }
+            return when {
+                timed.isNotEmpty() -> timed.map { it.durationMs }.average() / 1000.0
+                reps > 0 -> durationSec.toDouble() / reps
+                else -> 0.0
+            }
+        }
     val side: Hand get() = Hand.of(hand)
     val headline: Double get() = measureType.headline.of(this)
     val points: List<ForcePoint> get() = MeasureMath.decode(samples)
@@ -95,7 +111,34 @@ data class MeasurementEntity(
                 bodyWeightKg = bodyWeightKg,
             )
         }
+
+        /**
+         * A camera-counted set. [signal] is the movement the camera followed (0…100 across its range)
+         * so the result can draw it; [reps] is the count that stands, which the person may have corrected.
+         */
+        fun fromReps(
+            exerciseId: Long, sessionId: String, hand: Hand, seconds: Int, takenAt: Long,
+            signal: List<ForcePoint>, reps: Int, marks: List<app.grippy.camera.RepMark>, bodyWeightKg: Double?,
+        ): MeasurementEntity = MeasurementEntity(
+            exerciseId = exerciseId, sessionId = sessionId, type = MeasureType.Reps.key, hand = hand.key,
+            durationSec = seconds, takenAt = takenAt,
+            samples = MeasureMath.encode(MeasureMath.thin(signal, hz = 12)),
+            maxKg = 0.0, minKg = 0.0, avgKg = 0.0, impulse = 0.0, rfd = 0.0, cfKg = 0.0,
+            bodyWeightKg = bodyWeightKg, reps = reps, repMarks = RepMarks.encode(marks),
+        )
     }
+}
+
+/** Reps as text in the database. */
+object RepMarks {
+    fun encode(marks: List<app.grippy.camera.RepMark>): String =
+        marks.joinToString(";") { "${it.tMs}:${it.durationMs}:${it.amplitude}" }
+
+    fun decode(text: String): List<app.grippy.camera.RepMark> =
+        if (text.isBlank()) emptyList() else text.split(';').mapNotNull { part ->
+            val n = part.split(':').mapNotNull { it.toIntOrNull() }
+            if (n.size < 3) null else app.grippy.camera.RepMark(n[0], n[1], n[2])
+        }
 }
 
 /** Something planned for a day: a measurement type, maybe for an exercise. */
@@ -120,6 +163,14 @@ val MEASURE_MIGRATION_1_2 = object : Migration(1, 2) {
                 "`epochDay` INTEGER NOT NULL, `type` TEXT NOT NULL, `exerciseId` INTEGER, " +
                 "`note` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
         )
+    }
+}
+
+/** Version 3 adds the camera-counted reps to a measurement; everything measured before keeps 0 reps. */
+val MEASURE_MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `measurements` ADD COLUMN `reps` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `measurements` ADD COLUMN `repMarks` TEXT NOT NULL DEFAULT ''")
     }
 }
 
@@ -155,7 +206,7 @@ interface MeasureDao {
 
 @Database(
     entities = [FolderEntity::class, ExerciseEntity::class, MeasurementEntity::class, PlanEntity::class],
-    version = 2,
+    version = 3,
     exportSchema = false,
 )
 abstract class MeasureDatabase : RoomDatabase() {
@@ -215,7 +266,7 @@ object MeasureStores {
         val builder = if (Build.FINGERPRINT == "robolectric") {
             Room.inMemoryDatabaseBuilder(app, MeasureDatabase::class.java).allowMainThreadQueries()
         } else {
-            Room.databaseBuilder(app, MeasureDatabase::class.java, "grippy-measure.db").addMigrations(MEASURE_MIGRATION_1_2)
+            Room.databaseBuilder(app, MeasureDatabase::class.java, "grippy-measure.db").addMigrations(MEASURE_MIGRATION_1_2, MEASURE_MIGRATION_2_3)
         }
         return MeasureStore(builder.build()).also { store = it; owner = app }
     }

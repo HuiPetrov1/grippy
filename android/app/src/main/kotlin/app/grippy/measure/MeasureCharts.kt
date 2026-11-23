@@ -65,7 +65,11 @@ fun LiveCurve(points: List<ForcePoint>, windowSeconds: Int, color: Color, grid: 
 
 /** The share card's curve: area, line, avg dashed, max marked, min noted. White on the blue. */
 @Composable
-fun ResultCurve(points: List<ForcePoint>, windowSeconds: Int, avg: Double, max: Double, min: Double, modifier: Modifier = Modifier) {
+fun ResultCurve(
+    points: List<ForcePoint>, windowSeconds: Int, avg: Double, max: Double, min: Double, modifier: Modifier = Modifier,
+    /** False for a camera-counted set: the curve is a movement, with no kilograms to label. */
+    labelled: Boolean = true,
+) {
     val measurer = rememberTextMeasurer()
     Canvas(modifier) {
         if (points.size < 2) return@Canvas
@@ -73,7 +77,7 @@ fun ResultCurve(points: List<ForcePoint>, windowSeconds: Int, avg: Double, max: 
         val w = size.width - labelRoom
         val topPad = 18.dp.toPx()
         val h = size.height - topPad
-        val top = if (max > 0) max * 1.05 else 1.0
+        val top = if (max > 0) max * 1.05 else (points.maxOf { it.kg } * 1.05).coerceAtLeast(1.0)
         val span = max(windowSeconds.toDouble(), points.last().t).coerceAtLeast(0.1)
         val x = { t: Double -> (t / span * w).toFloat() }
         val y = { kg: Double -> (topPad + h - (kg.coerceAtLeast(0.0) / top) * h).toFloat() }
@@ -86,6 +90,7 @@ fun ResultCurve(points: List<ForcePoint>, windowSeconds: Int, avg: Double, max: 
         }
         drawPath(area, Color.White.copy(alpha = .28f))
         drawPath(line, Color.White, style = Stroke(2.2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        if (!labelled) return@Canvas
         // Average, dashed across, labelled at the right edge.
         val ay = y(avg)
         drawLine(Color.White, Offset(0f, ay), Offset(w, ay), 1.4.dp.toPx(),

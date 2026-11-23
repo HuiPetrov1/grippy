@@ -329,7 +329,7 @@ fun GroupScreen(nav: MeasureNavigator, route: MeasureRoute.Group) {
                     Spacer(Modifier.weight(1f))
                     Segmented(key.type.metrics, metric, { it.label }, { metric = it }, height = 39.dp, equal = false, fontSize = 12.sp)
                 }
-                Text("${metric.label} (${if (usePercent) "%BW" else metric.unit})", style = textStyle(21.5.sp, FontWeight.Bold, c.text),
+                Text(if (metric == Metric.Reps) metric.label else "${metric.label} (${if (usePercent) "%BW" else metric.unit})", style = textStyle(21.5.sp, FontWeight.Bold, c.text),
                     modifier = Modifier.padding(start = 16.dp, top = 15.dp, bottom = 7.dp))
                 HistoryChart(
                     left = dailyPoints(inRange.filter { it.side == Hand.Left }, metric, usePercent),

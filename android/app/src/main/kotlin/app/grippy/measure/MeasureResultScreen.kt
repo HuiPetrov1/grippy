@@ -137,8 +137,12 @@ fun ResultCard(m: MeasurementEntity, exerciseName: String) {
             }
             VLine()
             Cell(Modifier.weight(1f)) {
-                Text("Of bodyweight", style = textStyle(10.sp, FontWeight.Medium, CardSoft))
-                if (bodyWeight != null && headline.isForce) {
+                Text(if (type.usesCamera) "Tempo" else "Of bodyweight", style = textStyle(10.sp, FontWeight.Medium, CardSoft))
+                if (type.usesCamera) {
+                    CardValue(if (m.reps > 0) formatKg(m.tempoSec) else "—", if (m.reps > 0) "s/rep" else "", 30.sp)
+                    Spacer(Modifier.weight(1f))
+                    Text("Counted by camera", style = textStyle(7.sp, FontWeight.Medium, CardSoft))
+                } else if (bodyWeight != null && headline.isForce) {
                     val pct = headline.of(m) / bodyWeight * 100
                     CardValue("${pct.roundToInt()}", "%", 30.sp)
                     Spacer(Modifier.height(6.dp))
@@ -157,26 +161,40 @@ fun ResultCard(m: MeasurementEntity, exerciseName: String) {
         HLine()
         // Curve
         Column(Modifier.fillMaxWidth().height(100.dp).padding(start = 12.dp, end = 10.dp, top = 12.dp, bottom = 10.dp)) {
-            Text("Force curve · ${m.durationSec} s", style = textStyle(10.sp, FontWeight.Medium, CardSoft))
-            ResultCurve(points, m.durationSec, m.avgKg, m.maxKg, m.minKg, Modifier.fillMaxWidth().weight(1f))
+            Text("${if (type.usesCamera) "Movement" else "Force curve"} · ${m.durationSec} s", style = textStyle(10.sp, FontWeight.Medium, CardSoft))
+            ResultCurve(points, m.durationSec, m.avgKg, m.maxKg, m.minKg, Modifier.fillMaxWidth().weight(1f), labelled = !type.usesCamera)
         }
         HLine()
         Row(Modifier.fillMaxWidth().height(64.dp)) {
-            Cell(Modifier.weight(1f)) { Text("Max", style = textStyle(10.sp, FontWeight.Medium, CardSoft)); CardValue(formatKg(m.maxKg), "kg", 22.sp) }
-            VLine()
-            Cell(Modifier.weight(1f)) { Text("Min", style = textStyle(10.sp, FontWeight.Medium, CardSoft)); CardValue(formatKg(m.minKg), "kg", 22.sp) }
-            VLine()
-            Cell(Modifier.weight(1f)) { Text("Range", style = textStyle(10.sp, FontWeight.Medium, CardSoft)); CardValue(formatKg(m.maxKg - m.minKg), "kg", 22.sp) }
+            val trio = if (type.usesCamera) {
+                val took = m.marks.filter { it.durationMs > 0 }.map { it.durationMs / 1000.0 }
+                listOf(
+                    Triple("Time", "${m.durationSec}", "s"),
+                    Triple("Fastest rep", took.minOrNull()?.let { formatKg(it) } ?: "—", "s"),
+                    Triple("Slowest rep", took.maxOrNull()?.let { formatKg(it) } ?: "—", "s"),
+                )
+            } else {
+                listOf(Triple("Max", formatKg(m.maxKg), "kg"), Triple("Min", formatKg(m.minKg), "kg"), Triple("Range", formatKg(m.maxKg - m.minKg), "kg"))
+            }
+            trio.forEachIndexed { i, (label, value, unit) ->
+                if (i > 0) VLine()
+                Cell(Modifier.weight(1f)) { Text(label, style = textStyle(10.sp, FontWeight.Medium, CardSoft)); CardValue(value, unit, 22.sp) }
+            }
         }
         HLine()
         Row(Modifier.fillMaxWidth().height(72.dp)) {
             Cell(Modifier.weight(1f)) {
-                Text(if (type == MeasureType.Rfd) "Peak RFD" else "Force × time", style = textStyle(10.sp, FontWeight.Medium, CardSoft))
-                if (type == MeasureType.Rfd) CardValue("${m.rfd.roundToInt()}", "kg/s", 26.sp) else CardValue("${m.impulse.roundToInt()}", "kg·s", 26.sp)
+                Text(when { type == MeasureType.Rfd -> "Peak RFD"; type.usesCamera -> "Range of motion"; else -> "Force × time" },
+                    style = textStyle(10.sp, FontWeight.Medium, CardSoft))
+                when {
+                    type == MeasureType.Rfd -> CardValue("${m.rfd.roundToInt()}", "kg/s", 26.sp)
+                    type.usesCamera -> CardValue(m.marks.takeIf { it.isNotEmpty() }?.let { "${it.map { r -> r.amplitude }.average().roundToInt()}" } ?: "—", "%", 26.sp)
+                    else -> CardValue("${m.impulse.roundToInt()}", "kg·s", 26.sp)
+                }
             }
             VLine()
             Cell(Modifier.weight(1f)) {
-                Text("Grip", style = textStyle(10.sp, FontWeight.Medium, CardSoft))
+                Text(if (type.usesCamera) "Exercise" else "Grip", style = textStyle(10.sp, FontWeight.Medium, CardSoft))
                 Spacer(Modifier.height(6.dp))
                 Text(exerciseName, style = textStyle(13.sp, FontWeight.SemiBold, Color.White), maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
@@ -196,6 +214,7 @@ private fun headlineLabel(m: MeasurementEntity): String = when (m.measureType) {
     MeasureType.Peak -> "peak · ${m.side.label}"
     MeasureType.CriticalForce -> "critical force · ${m.side.label}"
     MeasureType.Rfd -> "max rate of force · ${m.side.label}"
+    MeasureType.Reps -> "reps · ${m.side.label}"
 }
 
 @Composable

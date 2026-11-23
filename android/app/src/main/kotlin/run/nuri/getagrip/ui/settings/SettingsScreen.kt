@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.VolumeMute
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
@@ -113,6 +114,7 @@ import run.nuri.getagrip.ui.theme.rememberReduceMotion
 
 private const val ROUTE_SETTINGS = "settings"
 private const val ROUTE_GAUGE_PICKER = "gauge-picker"
+private const val ROUTE_CAMERA = "camera-phone"
 
 /// The Settings tab: what the gauge is doing, a door to choosing one, and the statements the
 /// app owes whoever is using it.
@@ -148,7 +150,17 @@ fun SettingsScreen(
                 onOpenGaugePicker = dropUnlessResumed {
                     nav.navigate(ROUTE_GAUGE_PICKER) { launchSingleTop = true }
                 },
+                onOpenCamera = dropUnlessResumed {
+                    nav.navigate(ROUTE_CAMERA) { launchSingleTop = true }
+                },
             )
+        }
+        // Grippy: a second phone as a rep-counting camera.
+        composable(ROUTE_CAMERA) {
+            val back = dropUnlessResumed { nav.popBackStack(ROUTE_SETTINGS, inclusive = false) }
+            InnerScreen(title = "Camera phone", onBack = back) { padding ->
+                app.grippy.camera.CameraSetupScreen(Modifier.padding(padding))
+            }
         }
         composable(ROUTE_GAUGE_PICKER) {
             val back = dropUnlessResumed { nav.popBackStack(ROUTE_SETTINGS, inclusive = false) }
@@ -165,6 +177,7 @@ fun SettingsScreen(
 private fun SettingsRoot(
     onBack: (() -> Unit)?,
     onOpenGaugePicker: () -> Unit,
+    onOpenCamera: () -> Unit,
 ) {
     val palette = LocalGripPalette.current
     val device = LocalDeviceStore.current
@@ -229,6 +242,18 @@ private fun SettingsRoot(
                 }
                 // The SELECTED gauge, not a hardcoded Progressor.
                 LabelledValue(tr("Source"), device.gaugeKind.displayName)
+            }
+
+            // Grippy: reps counted by a second phone's camera.
+            run {
+                val context = androidx.compose.ui.platform.LocalContext.current
+                NavRow(
+                    icon = Icons.Outlined.Videocam,
+                    iconTint = palette.bleu,
+                    title = "Camera phone",
+                    subtitle = if (app.grippy.camera.CameraRole.isCamera(context)) "This phone is the camera" else "Count reps with a second phone",
+                    onClick = onOpenCamera,
+                )
             }
 
             WeightUnitSetting(LocalSettingsStore.current)

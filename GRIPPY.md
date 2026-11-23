@@ -32,6 +32,40 @@ changes merge cleanly.
   history chart per measurement type (Average / Max / Total Load, kg or % of bodyweight),
   and a shareable result card. The data lives in its own Room database, `grippy-measure.db`,
   so upstream's schema is untouched.
+- **Reps · camera**: a second phone counts reps for exercises the scale cannot hang on
+  (`android/app/src/main/kotlin/app/grippy/camera/`). See "Camera phone" below.
+
+## Camera phone
+
+Two phones, both with Grippy. One stands still and watches; the other is the one you use.
+
+- **Camera phone:** Settings → Camera phone → "Use this phone as the camera". It then waits
+  over Bluetooth (a foreground service, restarted after a reboot). The same page lists what
+  Android still needs allowed for the phone to wake by itself; Xiaomi has two extra switches
+  of its own that an app cannot read.
+- **Main phone:** Measure → "Reps · camera" → hands and "Start after". The camera phone lights
+  its screen, opens the camera on top of its lock screen (it is never unlocked), finds your
+  hand and counts until you press Stop. The count, time and tempo are saved to the exercise
+  like any measurement; the count can be corrected before saving.
+- **What crosses between the phones:** the count, each rep's time, the hand as 21 points for
+  a small preview, and a movement signal. No pictures or video leave the camera phone.
+- **How it counts:** MediaPipe's hand model (Apache-2.0, bundled as
+  `assets/hand_landmarker.task`, runs on the phone) gives up to two hands. Three counters run side by
+  side (`RepCounter.kt`): one on the whole picture shrunk to 32×24, one per hand. Each learns the
+  direction the movement goes, waits for 3 alike reps, then counts every return home; the set's
+  count is the highest of the three. It is a port of `tools/repcount/repcounter.py`, which was
+  measured on 21 real exercise clips (`tools/repcount/REPORT.md`: 19 exact, 1 off by one, 1 wrong);
+  `RepCounterReferenceTests` checks the port against it when `GRIPPY_REPLAB` points at the lab's
+  fixtures.
+- **Framing:** phone on a stand; the working forearm and hand large in the picture (a third to half
+  of it); the hand visible, not hidden behind the weight; background and the other hand still. The
+  count appears after the 3rd rep; sets of 1–2 reps are not counted.
+- **Tuning data:** with "Keep each set's measurements" on, the camera phone writes each set to
+  `Android/data/app.grippy/files/traces/` as numbers only (format in `SetTrace.kt`).
+  `adb pull` them and replay one with `tools/repcount/eval.py --bin2`.
+- **Testing without the main phone:** `scripts/grippy-camtest.py` plays the main phone from a
+  PC with Bluetooth: `grippy-camtest.py set 30` wakes the camera, counts for 30 s and prints
+  the reps.
 
 ## Look
 

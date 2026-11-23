@@ -32,13 +32,24 @@ class MeasureMigrationTests {
             db.version = 1
         }
         val room = Room.databaseBuilder(context, MeasureDatabase::class.java, "migration-test.db")
-            .addMigrations(MEASURE_MIGRATION_1_2).allowMainThreadQueries().build()
+            .addMigrations(MEASURE_MIGRATION_1_2, MEASURE_MIGRATION_2_3).allowMainThreadQueries().build()
         try {
             val dao = room.dao()
             assertEquals(listOf("supinated front raise"), dao.exercises().first().map { it.name })
             assertEquals(1, dao.measurements().first().size)
             dao.insert(PlanEntity(epochDay = LocalDate.of(2026, 11, 26).toEpochDay(), type = "peak", exerciseId = 1))
             assertEquals(1, dao.plans().first().size)
+            // What was measured with the scale has no reps; a camera-counted set keeps its own.
+            assertEquals(0, dao.measurements().first().single().reps)
+            val marks = listOf(app.grippy.camera.RepMark(2_000, 1_800, 100), app.grippy.camera.RepMark(4_100, 2_100, 92))
+            dao.insert(listOf(MeasurementEntity.fromReps(1, "s2", Hand.Right, 4, 2000,
+                listOf(ForcePoint(0.0, 10.0), ForcePoint(1.0, 90.0)), reps = 3, marks = marks, bodyWeightKg = null)))
+            val saved = dao.measurements().first().last()
+            assertEquals(MeasureType.Reps, saved.measureType)
+            assertEquals(3, saved.reps)
+            assertEquals(marks, saved.marks)
+            assertEquals(3.0, saved.headline, 1e-9)
+            assertEquals(1.95, saved.tempoSec, 1e-9)
         } finally {
             room.close()
             file.delete()

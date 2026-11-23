@@ -130,6 +130,8 @@ class GetAGripApplication : Application() {
         // A fresh process cannot have a session running — see
         // `SessionForegroundService.cancelStaleCard`.
         SessionForegroundService.cancelStaleCard(this)
+        // Grippy: a phone that is the camera goes back to waiting as soon as the app's process is up.
+        app.grippy.camera.CameraLinkService.start(this)
     }
 
     /// **The engine's display strings resolve through the app's string resources.**

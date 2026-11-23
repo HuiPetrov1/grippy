@@ -128,6 +128,8 @@ fun MeasureRouteHost(nav: MeasureNavigator) {
         is MeasureRoute.Result -> ResultScreen(nav, route)
         is MeasureRoute.Run -> MeasureRunScreen(nav, route.run)
         is MeasureRoute.Review -> MeasureReviewScreen(nav, route.run)
+        is MeasureRoute.Reps -> RepRunScreen(nav, route.run)
+        is MeasureRoute.RepsReview -> RepReviewScreen(nav, route.run)
         null -> Unit
     }
 }

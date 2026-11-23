@@ -314,7 +314,7 @@ fun HandSheet(nav: MeasureNavigator, context: StartContext) {
     var left by remember { mutableStateOf(true) }
     var right by remember { mutableStateOf(false) }
     var seconds by remember { mutableStateOf((context.seconds?.takeIf { it > 0 } ?: type.defaultSeconds).toString()) }
-    var startAfter by remember { mutableStateOf(if (type == MeasureType.Peak) "3" else "7") }
+    var startAfter by remember { mutableStateOf(when (type) { MeasureType.Peak -> "3"; MeasureType.Reps -> "5"; else -> "7" }) }
     var active by rememberSaveable { mutableStateOf(false) }
     var explain by remember { mutableStateOf(false) }
     MeasureSheet(onDismiss = { nav.handSheet = null }) {
@@ -368,7 +368,7 @@ fun HandSheet(nav: MeasureNavigator, context: StartContext) {
             if (type != MeasureType.Peak || showStartAfter) Spacer(Modifier.height(20.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                 when (type) {
-                    MeasureType.Peak -> Unit
+                    MeasureType.Peak, MeasureType.Reps -> Unit
                     MeasureType.CriticalForce -> Column(Modifier.weight(1f)) {
                         SectionLabel("Protocol")
                         Spacer(Modifier.height(8.dp))
@@ -391,16 +391,24 @@ fun HandSheet(nav: MeasureNavigator, context: StartContext) {
                     }
                 }
                 // Peak, active: keep the field half-width, like the others.
-                if (type == MeasureType.Peak && showStartAfter) Spacer(Modifier.weight(1f))
+                if ((type == MeasureType.Peak || type == MeasureType.Reps) && showStartAfter) Spacer(Modifier.weight(1f))
+            }
+            if (type == MeasureType.Reps) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Your camera phone wakes up and counts. \"Start after\" is the time you have to get in position. " +
+                        "The count shows after your 3rd rep (the first three arrive together). Press Stop when the set is done.",
+                    style = textStyle(13.5.sp, FontWeight.Normal, c.text2),
+                )
             }
             Spacer(Modifier.height(20.dp))
             val duration = seconds.toIntOrNull()?.coerceIn(1, 600) ?: type.defaultSeconds
             val hands = listOfNotNull(Hand.Left.takeIf { left }, Hand.Right.takeIf { right })
             PrimaryButton(
-                when {
-                    left && right -> "Measure both"
-                    left -> "Measure left"
-                    else -> "Measure right"
+                (if (type == MeasureType.Reps) "Count " else "Measure ") + when {
+                    left && right -> "both"
+                    left -> "left"
+                    else -> "right"
                 },
                 onClick = {
                     nav.begin(MeasureRequest(
@@ -409,6 +417,7 @@ fun HandSheet(nav: MeasureNavigator, context: StartContext) {
                         seconds = when (type) {
                             MeasureType.CriticalForce -> CF_TOTAL_SECONDS
                             MeasureType.Peak -> PEAK_MAX_SECONDS
+                            MeasureType.Reps -> 0
                             else -> duration
                         },
                         // A passive Peak has no countdown: it's armed and starts with the pull.

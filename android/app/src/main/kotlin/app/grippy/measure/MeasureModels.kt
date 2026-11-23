@@ -35,7 +35,12 @@ enum class MeasureType(
     Peak("peak", "Peak", "Maximum isometric force.", Color(0xFF0A84FF), 0),
     Endurance("endurance", "Endurance", "How long you can hold force", Color(0xFFFCC33E), 10),
     CriticalForce("cf", "Critical Force", "Sustainable force over repeated efforts", Color(0xFFBF5AF2), 0),
-    Rfd("rfd", "RFD", "Measure how quickly you can generate force.", Color(0xFF3FC8E4), 3);
+    Rfd("rfd", "RFD", "Measure how quickly you can generate force.", Color(0xFF3FC8E4), 3),
+    /** Counted by the camera phone, not the scale. */
+    Reps("reps", "Reps · camera", "Your second phone counts the reps.", Color(0xFF30D158), 0);
+
+    /** Everything else is measured with the scale. */
+    val usesCamera: Boolean get() = this == Reps
 
     /** The radio row's title. */
     val menuLabel: String get() = if (this == CriticalForce) "$label · $CF_REPS reps" else label
@@ -47,6 +52,7 @@ enum class MeasureType(
             Endurance -> listOf(Metric.Average, Metric.Max, Metric.TotalLoad)
             CriticalForce -> listOf(Metric.CriticalForce, Metric.Max, Metric.TotalLoad)
             Rfd -> listOf(Metric.Rfd, Metric.Max, Metric.TotalLoad)
+            Reps -> listOf(Metric.Reps, Metric.RepTime, Metric.Tempo)
         }
 
     val headline: Metric get() = metrics.first()
@@ -70,7 +76,10 @@ enum class Metric(val label: String, val unit: String) {
     Max("Max", "kg"),
     TotalLoad("Total Load", "kg·s"),
     CriticalForce("Critical Force", "kg"),
-    Rfd("RFD", "kg/s");
+    Rfd("RFD", "kg/s"),
+    Reps("Reps", "reps"),
+    RepTime("Time", "s"),
+    Tempo("Tempo", "s/rep");
 
     /** Only force-shaped numbers have a meaningful % of bodyweight. */
     val isForce: Boolean get() = unit == "kg"
@@ -81,6 +90,9 @@ enum class Metric(val label: String, val unit: String) {
         TotalLoad -> m.impulse
         CriticalForce -> m.cfKg
         Rfd -> m.rfd
+        Reps -> m.reps.toDouble()
+        RepTime -> m.durationSec.toDouble()
+        Tempo -> m.tempoSec
     }
 }
 
@@ -95,6 +107,7 @@ data class GroupKey(val type: MeasureType, val seconds: Int) {
             MeasureType.Peak -> "Peak"
             MeasureType.CriticalForce -> "Critical Force"
             MeasureType.Rfd -> "RFD"
+            MeasureType.Reps -> "Reps"
         }
 
     /** Stable string for saved navigation. */
@@ -206,7 +219,7 @@ object MeasureMath {
 fun formatKg(value: Double): String = "%.1f".format(Locale.US, value)
 
 fun formatNumber(value: Double, unit: String): String = when (unit) {
-    "kg·s", "kg/s" -> value.roundToInt().toString()
+    "kg·s", "kg/s", "reps", "s" -> value.roundToInt().toString()
     else -> formatKg(value)
 }
 

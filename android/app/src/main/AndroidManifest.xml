@@ -18,6 +18,18 @@
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
+    <!-- Grippy, camera phone: a phone set up as the stationary camera has to be FOUND by the main
+         phone (advertise), light its own screen when asked (wake lock), and put the camera on top
+         of the lock screen from the background. Android lets a background app open a screen only
+         if it may draw over other apps, or through a full-screen notification; both are declared
+         and the person allows them once in Settings → Camera phone. None of this is used on a
+         phone that is not the camera. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <!-- Session reminders. DECLARED here and REQUESTED on the first Save of a routine
          that actually wants them — by then the user has been through the builder and seen
          both times on screen, so the dialog arrives with its reason on the previous
@@ -147,6 +159,31 @@
             android:name=".runner.SessionForegroundService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <!-- Grippy, camera phone: the camera screen (its own task, on top of the lock screen),
+             the Bluetooth link that waits for the main phone, and the restart after a reboot. -->
+        <activity
+            android:name="app.grippy.camera.CameraActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="app.grippy.camera"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode|density"
+            android:theme="@style/Theme.GetAGrip" />
+        <service
+            android:name="app.grippy.camera.CameraLinkService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+        <receiver
+            android:name="app.grippy.camera.CameraBootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- Replans every reminder after a reboot (and after the app is updated in place,
              which also drops pending alarms). `exported="true"` is required for a system

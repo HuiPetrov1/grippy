@@ -41,6 +41,9 @@ sealed interface MeasureRoute {
     data class Result(val sessionId: String) : MeasureRoute
     class Run(val run: MeasureRun) : MeasureRoute
     class Review(val run: MeasureRun) : MeasureRoute
+    /** Counting reps with the camera phone, and then looking at what it counted. */
+    class Reps(val run: RepRun) : MeasureRoute
+    class RepsReview(val run: RepRun) : MeasureRoute
 }
 
 /** The Measure section's back stack and its two sheets. Outlives a rotation. */
@@ -68,12 +71,12 @@ class MeasureNavigator : ViewModel() {
     fun begin(request: MeasureRequest) {
         handSheet = null
         startSheet = null
-        push(MeasureRoute.Run(MeasureRun(request)))
+        push(if (request.type.usesCamera) MeasureRoute.Reps(RepRun(request)) else MeasureRoute.Run(MeasureRun(request)))
     }
 
     /** After Save: the exercise's Measure tab, with the list underneath. */
     fun showExercise(id: Long) {
-        while (stack.isNotEmpty() && (top is MeasureRoute.Run || top is MeasureRoute.Review)) pop()
+        while (stack.isNotEmpty() && (top is MeasureRoute.Run || top is MeasureRoute.Review || top is MeasureRoute.Reps || top is MeasureRoute.RepsReview)) pop()
         val existing = stack.indexOfFirst { it is MeasureRoute.Exercise && it.id == id }
         if (existing >= 0) {
             while (stack.size > existing + 1) pop()

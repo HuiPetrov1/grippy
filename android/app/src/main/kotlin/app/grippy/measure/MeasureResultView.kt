@@ -198,9 +198,16 @@ private fun HandDetail(m: MeasurementEntity) {
                     }
                 }
                 Spacer(Modifier.height(10.dp))
-                ScrubCurve(points, m.durationSec.toDouble(), m.avgKg, handColor, Modifier.fillMaxWidth().height(200.dp))
-                Spacer(Modifier.height(6.dp))
-                Text("Touch and drag the curve to read any moment.", style = textStyle(12.sp, FontWeight.Normal, c.text3))
+                if (type.usesCamera) {
+                    val marks = remember(m.id) { m.marks.map { it.tMs / 1000.0 } }
+                    ScrubCurve(points, m.durationSec.toDouble(), 0.0, handColor, Modifier.fillMaxWidth().height(200.dp), unit = "%", marks = marks)
+                    Spacer(Modifier.height(6.dp))
+                    Text("The movement the camera followed. Each tick along the bottom is a counted rep.", style = textStyle(12.sp, FontWeight.Normal, c.text3))
+                } else {
+                    ScrubCurve(points, m.durationSec.toDouble(), m.avgKg, handColor, Modifier.fillMaxWidth().height(200.dp))
+                    Spacer(Modifier.height(6.dp))
+                    Text("Touch and drag the curve to read any moment.", style = textStyle(12.sp, FontWeight.Normal, c.text3))
+                }
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -225,11 +232,22 @@ private fun headlineCaption(m: MeasurementEntity): String = when (m.measureType)
     MeasureType.Peak -> "peak force"
     MeasureType.CriticalForce -> "critical force"
     MeasureType.Rfd -> "rate of force development"
+    MeasureType.Reps -> "counted by camera"
 }
 
 private class Tile(val label: String, val value: Double, val unit: String, val decimals: Int = 1)
 
 private fun statTiles(m: MeasurementEntity, points: List<ForcePoint>): List<Tile> {
+    if (m.measureType.usesCamera) {
+        val took = m.marks.filter { it.durationMs > 0 }.map { it.durationMs / 1000.0 }
+        val tiles = mutableListOf(Tile("Time", m.durationSec.toDouble(), "s", 0))
+        if (m.reps > 0) tiles += Tile("Tempo", m.tempoSec, "s/rep")
+        took.minOrNull()?.let { tiles += Tile("Fastest rep", it, "s") }
+        took.maxOrNull()?.let { tiles += Tile("Slowest rep", it, "s") }
+        if (m.marks.isNotEmpty()) tiles += Tile("Range of motion", m.marks.map { it.amplitude }.average(), "%", 0)
+        if (m.marks.size != m.reps) tiles += Tile("Camera counted", m.marks.size.toDouble(), "reps", 0)
+        return tiles
+    }
     val ttp = MeasureMath.timeToPeak(points)
     val base = mutableListOf(
         Tile("Max", m.maxKg, "kg"),
@@ -270,7 +288,7 @@ private fun StatTile(tile: Tile, index: Int, modifier: Modifier) {
 @Composable
 fun CountUp(
     value: Double, unit: String, size: androidx.compose.ui.unit.TextUnit, color: Color, unitColor: Color,
-    decimals: Int = if (unit == "kg·s" || unit == "kg/s") 0 else 1, delayMillis: Int = 0,
+    decimals: Int = if (unit in setOf("kg·s", "kg/s", "reps", "s", "%")) 0 else 1, delayMillis: Int = 0,
 ) {
     val anim = remember { Animatable(0f) }
     LaunchedEffect(value) {
@@ -286,7 +304,13 @@ fun CountUp(
  * a dot on the curve and the time and force there. The average is the dashed line.
  */
 @Composable
-fun ScrubCurve(points: List<ForcePoint>, seconds: Double, avg: Double, color: Color, modifier: Modifier = Modifier) {
+fun ScrubCurve(
+    points: List<ForcePoint>, seconds: Double, avg: Double, color: Color, modifier: Modifier = Modifier,
+    /** "kg" for a force; "%" for a camera-followed movement, which has no peak worth marking. */
+    unit: String = "kg",
+    /** Moments to tick along the bottom (seconds): the counted reps. */
+    marks: List<Double> = emptyList(),
+) {
     val c = measureColors()
     val measurer = rememberTextMeasurer()
     val reveal = remember(points) { Animatable(0f) }
@@ -302,7 +326,8 @@ fun ScrubCurve(points: List<ForcePoint>, seconds: Double, avg: Double, color: Co
     }
     val span = max(seconds, points.last().t).coerceAtLeast(0.5)
     val peak = points.maxBy { it.kg }
-    val ticks = niceTicks(0.0, max(peak.kg, 1.0) * 1.1, 4)
+    // A movement is drawn across its own range, 0 to 100 %.
+    val ticks = if (unit == "%") listOf(0.0, 50.0, 100.0) else niceTicks(0.0, max(peak.kg, 1.0) * 1.1, 4)
     val top = ticks.last()
     val labelStyle = TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.text, fontSize = 11.sp, color = c.text3)
 
@@ -353,8 +378,12 @@ fun ScrubCurve(points: List<ForcePoint>, seconds: Double, avg: Double, color: Co
             drawLine(c.text2.copy(alpha = .8f * reveal.value), Offset(0f, ay), Offset(w * reveal.value, ay), 1.5.dp.toPx(),
                 pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
         }
+        for (mark in marks) {
+            val mx = x(mark)
+            if (mx <= w * reveal.value) drawLine(color, Offset(mx, h - 9.dp.toPx()), Offset(mx, h), 2.dp.toPx(), StrokeCap.Round)
+        }
         // The peak, once the curve reaches it.
-        if (x(peak.t) <= w * reveal.value) {
+        if (unit == "kg" && x(peak.t) <= w * reveal.value) {
             drawCircle(c.bg, 5.dp.toPx(), Offset(x(peak.t), y(peak.kg)))
             drawCircle(color, 5.dp.toPx(), Offset(x(peak.t), y(peak.kg)), style = Stroke(2.dp.toPx()))
         }
@@ -367,7 +396,7 @@ fun ScrubCurve(points: List<ForcePoint>, seconds: Double, avg: Double, color: Co
             drawLine(c.text.copy(alpha = .5f * pinAlpha), Offset(px, 0f), Offset(px, h), 1.dp.toPx())
             drawCircle(color.copy(alpha = pinAlpha), 6.dp.toPx(), Offset(px, py))
             drawCircle(Color.White.copy(alpha = pinAlpha), 2.5.dp.toPx(), Offset(px, py))
-            val text = measurer.measure("${formatKg(kg)} kg · ${"%.1f".format(Locale.US, t)} s",
+            val text = measurer.measure("${if (unit == "kg") formatKg(kg) else kg.roundToInt().toString()} $unit · ${"%.1f".format(Locale.US, t)} s",
                 TextStyle(fontFamily = run.nuri.getagrip.ui.theme.GripFonts.text, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = c.text.copy(alpha = pinAlpha)))
             val pad = 8.dp.toPx()
             val bw = text.size.width + pad * 2

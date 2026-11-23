@@ -137,6 +137,22 @@ class ScreenshotTest(private val theme: String) {
                 session(now - 2 * day, MeasureType.Endurance, 10, 6.6, 5.7) +
                 session(now - 3_600_000, MeasureType.Endurance, 15, 5.3, null),
         )
+        // A camera-counted exercise: two sets of wrist curls, both hands.
+        val curls = store.addExercise("wrist curl", null)
+        fun reps(at: Long, hand: Hand, count: Int, period: Double, corrected: Int = count): MeasurementEntity {
+            val marks = (1..count).map { app.grippy.camera.RepMark((1500 + it * period * 1000).toInt(), (period * 1000).toInt(), 100 - it % 4 * 5) }
+            val seconds = (1.5 + count * period + 1).toInt()
+            val signal = (0..seconds * 10).map { i ->
+                val t = i / 10.0
+                val phase = ((t - 1.5) / period).coerceIn(0.0, count.toDouble())
+                ForcePoint(t, 50 - 45 * kotlin.math.cos(2 * Math.PI * phase))
+            }
+            return MeasurementEntity.fromReps(curls, "reps-$at", hand, (count * period).toInt(), at, signal, corrected, marks, 68.0)
+        }
+        store.save(listOf(
+            reps(now - 4 * day, Hand.Left, 12, 2.1), reps(now - 4 * day, Hand.Right, 11, 2.2),
+            reps(now - 1_800_000, Hand.Left, 15, 1.9), reps(now - 1_800_000, Hand.Right, 13, 2.0, corrected = 14),
+        ))
     }
 
     private fun tabTap(label: String) {
@@ -213,6 +229,45 @@ class ScreenshotTest(private val theme: String) {
         openStartSheet()
         tap("Start Peak")
         shoot("16b-peak-hand-sheet")
+    }
+
+    @Test fun repsHandSheet() {
+        openStartSheet()
+        tap("Your second phone counts the reps")
+        tap("Start Reps")
+        shoot("16c-reps-hand-sheet")
+    }
+
+    @Test fun repsExercise() { tabTap("Measure"); tap("wrist curl"); shoot("12c-reps-exercise") }
+
+    @Test fun repsGroup() { tabTap("Measure"); tap("wrist curl"); tap("Reps"); shoot("13c-reps-group") }
+
+    @Test fun repsResult() { tap("Reps"); shoot("14d-reps-result") }
+
+    @Test fun repsResultCard() {
+        tap("Reps")
+        compose.onNodeWithText("Share both cards").performScrollTo()
+        settle()
+        shoot("14e-reps-share-card")
+    }
+
+    @Test fun repsLookingForCamera() {
+        org.robolectric.Shadows.shadowOf(application).grantPermissions(
+            android.Manifest.permission.BLUETOOTH_SCAN, android.Manifest.permission.BLUETOOTH_CONNECT)
+        openStartSheet()
+        tap("Your second phone counts the reps")
+        tap("Start Reps")
+        tap("Count left")
+        shoot("17c-reps-connecting")
+    }
+
+    @Test fun cameraSetup() {
+        compose.onNode(androidx.compose.ui.test.hasContentDescription("Settings")).performClick()
+        settle()
+        compose.onNodeWithText("Camera phone").performScrollTo()
+        settle()
+        tap("Camera phone")
+        shoot("05b-camera-setup")
     }
 
     private fun openStartSheet() {
