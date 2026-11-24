@@ -92,6 +92,87 @@ object RepTuning {
     /** Another signal takes the lead when it has this many more reps. */
     const val LEAD_MARGIN = 1
     const val EPS = 1e-12
+
+    // Fast counters (run 4): small quick reps riding on slower, bigger movement (arm, body, the hanging
+    // weight). Each signal is also counted from its features minus their straight-line trend over the last
+    // HIGH_PASS_SEC, keeping only short reps. Removing the trend turns each turn of a slow rep into a short bump
+    // too, so a fast counter may lead only when it clearly sees something else (FAST_MIN_LEAD, FAST_RATIO,
+    // FAST_MAX_CV). Burnout set of ~83 tiny 2-per-second partials: 13 counted before, 64 after; a slow sway
+    // 1.7× the size of 40 reps: 0 before, 40 after; every result of the 21 clips × 6 variants is unchanged.
+    /** Trend window. 1.5 counted 47 of the burnout and 26 of 40 under a big sway; the plain mean instead of the trend, 0. */
+    const val HIGH_PASS_SEC = 1.0
+    /** The away part of a 2-per-second rep lasts ~0.3 s: 0.35 rejected half of them. */
+    const val FAST_MIN_REP_SEC = 0.15
+    /** Longer away parts are left to the slow counters. */
+    const val FAST_MAX_REP_SEC = 1.0
+    /** 0.12 damps a 2 Hz swing by half. */
+    const val FAST_SMOOTH_SEC = 0.06
+    /** Burnout 54 (0.15) / 64 (0.10) / 69 (0.07). */
+    const val FAST_SWING = 0.10
+    /** Reps a fast counter needs before it may lead (and the rhythm is judged over). */
+    const val FAST_MIN_LEAD = 8
+    /** …and this many times the best slow count: slow reps split in two reach 1.6–2.3×. */
+    const val FAST_RATIO = 3.0
+    /** …and its last reps evenly spaced: gap spread ≤ 0.3 of the mean gap (burnout 0.07–0.14, a gripper's squeeze/release 0.37+). */
+    const val FAST_MAX_CV = 0.3
+}
+
+/** The limits one counter works with: slow (every rep) or fast (short reps on high-passed features). */
+class RepKind(val minRep: Double, val maxRep: Double, val smoothSec: Double, val swing: Double) {
+    companion object {
+        val Slow = RepKind(RepTuning.MIN_REP_SEC, RepTuning.MAX_REP_SEC, RepTuning.SMOOTH_SEC, RepTuning.SWING)
+        val Fast = RepKind(RepTuning.FAST_MIN_REP_SEC, RepTuning.FAST_MAX_REP_SEC, RepTuning.FAST_SMOOTH_SEC, RepTuning.FAST_SWING)
+    }
+}
+
+/**
+ * A feature vector minus the straight line that best fits those pushed over the last
+ * [RepTuning.HIGH_PASS_SEC] (this one included), taken at its time: slow movement, even a steady drift, is removed.
+ */
+class HighPass {
+    private val times = ArrayDeque<Double>()
+    private val xs = ArrayDeque<DoubleArray>()
+    private var sum: DoubleArray? = null
+
+    fun push(t: Double, x: DoubleArray): DoubleArray {
+        times.addLast(t); xs.addLast(x)
+        val s = sum?.also { for (i in it.indices) it[i] += x[i] } ?: x.copyOf().also { sum = it }
+        while (times.size > 1 && t - times.first() > RepTuning.HIGH_PASS_SEC) {
+            val old = xs.removeFirst(); times.removeFirst()
+            for (i in s.indices) s[i] -= old[i]
+        }
+        val n = times.size
+        var tSum = 0.0
+        for (tt in times) tSum += tt
+        val tm = tSum / n
+        val xm = DoubleArray(x.size) { s[it] / n }
+        var stt = 0.0
+        val stx = DoubleArray(x.size)
+        for (k in 0 until n) {
+            val d = times[k] - tm
+            stt += d * d
+            val xx = xs[k]
+            for (i in stx.indices) stx[i] = stx[i] + (xx[i] - xm[i]) * d
+        }
+        if (stt <= 0) return DoubleArray(x.size) { x[it] - xm[it] }
+        val k = (t - tm) / stt
+        return DoubleArray(x.size) { x[it] - (xm[it] + stx[it] * k) }
+    }
+}
+
+/** The last [RepTuning.FAST_MIN_LEAD] reps came at an even rhythm. */
+internal fun steady(reps: List<CountedRep>): Boolean {
+    val n = RepTuning.FAST_MIN_LEAD
+    if (reps.size < n) return false
+    val t = reps.subList(reps.size - n, reps.size).map { it.t }
+    val gaps = DoubleArray(t.size - 1) { t[it + 1] - t[it] }
+    var sum = 0.0
+    for (g in gaps) sum += g
+    val m = sum / gaps.size
+    if (m <= 0) return false
+    var sq = 0.0
+    for (g in gaps) sq += (g - m) * (g - m)
+    return sqrt(sq / gaps.size) <= RepTuning.FAST_MAX_CV * m
 }
 
 private fun median(values: List<Double>): Double {
@@ -160,13 +241,13 @@ object RepFeatures {
 }
 
 /** Which side of the middle band the signal is on; a change reports the extreme reached on the side left. */
-private class Sides {
+private class Sides(private val swing: Double) {
     var side = 0
     var ext = 0.0
 
     /** (new side, extreme) when the side changes, else null. */
     fun step(u: Double): Pair<Int, Double>? {
-        val now = if (u > RepTuning.SWING) 1 else if (u < -RepTuning.SWING) -1 else 0
+        val now = if (u > swing) 1 else if (u < -swing) -1 else 0
         if (side == 0) {
             if (now != 0) { side = now; ext = u }
             return null
@@ -187,7 +268,7 @@ class CountedRep(val t: Double, val dur: Double, val active: Double, val amp: Do
  * Counts reps in one stream of feature vectors: learns the movement, waits for 3 alike reps, then counts
  * each return home. [push] may be skipped on frames where this signal is missing; time gaps are fine.
  */
-class SignalCounter(private val dim: Int, private val minRange: Double) {
+class SignalCounter(private val dim: Int, private val minRange: Double, val kind: RepKind = RepKind.Slow) {
     private val times = ArrayList<Double>()
     private val xs = ArrayList<DoubleArray>()
     private val units = ArrayList<Double>()
@@ -214,7 +295,7 @@ class SignalCounter(private val dim: Int, private val minRange: Double) {
     private var home = 0
     private var smooth: Double? = null
     private var lastT: Double? = null
-    private var sides = Sides()
+    private var sides = Sides(kind.swing)
     private var wasHome = false
     private var leftHomeAt: Double? = null
     private var prevHomeExt: Double? = null
@@ -242,7 +323,7 @@ class SignalCounter(private val dim: Int, private val minRange: Double) {
     fun push(t: Double, x: DoubleArray, unit: Double): List<CountedRep> {
         val out = ArrayList<CountedRep>()
         val dt = lastT?.let { max(t - it, 0.0) } ?: 0.0
-        val k = 1.0 - exp(-dt / RepTuning.SMOOTH_SEC)
+        val k = 1.0 - exp(-dt / kind.smoothSec)
         times.add(t); xs.add(x); units.add(unit)
         while (times.size > 2 && t - times[0] > RepTuning.BUFFER_SEC) { times.removeAt(0); xs.removeAt(0); units.removeAt(0) }
         if (locked) {
@@ -312,7 +393,7 @@ class SignalCounter(private val dim: Int, private val minRange: Double) {
             val t = times[i]
             if (t <= tFrom) continue
             val raw = centredDot(xs[i], mean, axis)
-            sm = if (sm == null) raw else sm + (raw - sm) * (1.0 - exp(-(t - lt) / RepTuning.SMOOTH_SEC))
+            sm = if (sm == null) raw else sm + (raw - sm) * (1.0 - exp(-(t - lt) / kind.smoothSec))
             lt = t
             out.add(t to (sm - mid) / rng)
         }
@@ -323,15 +404,15 @@ class SignalCounter(private val dim: Int, private val minRange: Double) {
 
     /** Reps in a series: leave home, reach the other side, come back (a neutral start counts its first return). */
     private fun cycles(series: List<Pair<Double, Double>>, home: Int): List<Cycle> {
-        val sides = Sides()
+        val sides = Sides(kind.swing)
         val reps = ArrayList<Cycle>()
         var left: Double? = null
         var prevExt: Double? = null
         var wasHome = false
         var neutralStart: Boolean? = null
         for ((t, u) in series) {
-            if (neutralStart == null) neutralStart = abs(u) <= RepTuning.SWING
-            val atHome = u * home > RepTuning.SWING
+            if (neutralStart == null) neutralStart = abs(u) <= kind.swing
+            val atHome = u * home > kind.swing
             if (wasHome && !atHome) left = t
             wasHome = atHome
             val hadSide = sides.side
@@ -427,7 +508,7 @@ class SignalCounter(private val dim: Int, private val minRange: Double) {
         val from = max(0, times.size - RepTuning.RESMOOTH_FRAMES)
         for (i in from until times.size) {
             val raw = centredDot(xs[i], mean, axis)
-            sm = if (sm == null) raw else sm + (raw - sm) * (1.0 - exp(-(times[i] - lt) / RepTuning.SMOOTH_SEC))
+            sm = if (sm == null) raw else sm + (raw - sm) * (1.0 - exp(-(times[i] - lt) / kind.smoothSec))
             lt = times[i]
         }
         return sm
@@ -441,7 +522,7 @@ class SignalCounter(private val dim: Int, private val minRange: Double) {
         var bestHome = 0
         var best: List<Cycle>? = null
         for (h in intArrayOf(1, -1)) {
-            val reps = cycles(series, h).filter { it.active >= RepTuning.MIN_REP_SEC && it.active <= RepTuning.MAX_REP_SEC }
+            val reps = cycles(series, h).filter { it.active >= kind.minRep && it.active <= kind.maxRep }
             val run = alikeRun(reps)
             if (run.size >= RepTuning.CONFIRM_REPS && t - run.last().t <= RepTuning.MAX_GAP_SEC) {
                 if (best == null || run[0].start < best[0].start) { best = run; bestHome = h }
@@ -454,7 +535,7 @@ class SignalCounter(private val dim: Int, private val minRange: Double) {
         val out = ArrayList<CountedRep>()
         for (r in run) out.add(emit(r.t, r.active, r.amp * rng))
         // Bring the live state machine to where the replay is now.
-        sides = Sides(); smooth = sm; leftHomeAt = null; wasHome = false; prevHomeExt = null; awayAt = null
+        sides = Sides(kind.swing); smooth = sm; leftHomeAt = null; wasHome = false; prevHomeExt = null; awayAt = null
         val lastT = run.last().t
         for ((tt, u) in series) if (tt > lastT) advance(tt, u)?.let { out.add(it) }
         if (sides.side == 0) sides.side = home
@@ -473,7 +554,7 @@ class SignalCounter(private val dim: Int, private val minRange: Double) {
     }
 
     private fun advance(t: Double, u: Double): CountedRep? {
-        val atHome = u * home > RepTuning.SWING
+        val atHome = u * home > kind.swing
         if (wasHome && !atHome) leftHomeAt = t
         wasHome = atHome
         val (now, ext) = sides.step(u) ?: return null
@@ -485,7 +566,7 @@ class SignalCounter(private val dim: Int, private val minRange: Double) {
         val ampAbs = abs(ext - prev) * range
         val typA = median(typAmp.takeLast(RepTuning.TYPICAL_OF_LAST))
         val typD = median(typDur.takeLast(RepTuning.TYPICAL_OF_LAST))
-        if (active < max(RepTuning.MIN_REP_SEC, RepTuning.MIN_REL_DUR * typD) || active > RepTuning.MAX_REP_SEC) return null
+        if (active < max(kind.minRep, RepTuning.MIN_REL_DUR * typD) || active > kind.maxRep) return null
         if (ampAbs < RepTuning.MIN_REL_AMP * typA || ampAbs > RepTuning.MAX_REL_AMP * typA) return null
         typAmp.add(ampAbs)
         typDur.add(active)
@@ -551,16 +632,24 @@ class HandTracks(private val aspect: Double) {
 }
 
 /**
- * One set: three counters side by side (the whole picture, hand track A, hand track B). The count is the
- * highest of them: the picture misses a small hand's movement, a hand track misses frames where the hand is
- * not recognised, and a still helper hand never counts at all.
+ * One set: three signals (the whole picture, hand track A, hand track B), each counted twice: as it is and
+ * fast (high-passed, short reps only). The count is the highest of the six: the picture misses a small
+ * hand's movement, a hand track misses frames where the hand is not recognised, a still helper hand never
+ * counts at all, and quick small reps on top of slower movement only show once the slow movement is removed.
+ * The picture can come every frame and the hands less often ([pushPicture], [pushHands]).
  */
 class RepCounter(private val aspect: Double) {
-    enum class Source { Picture, HandA, HandB }
+    enum class Source(val fast: Boolean) {
+        Picture(false), HandA(false), HandB(false), PictureFast(true), HandAFast(true), HandBFast(true);
+
+        /** Whether this follows the picture rather than a hand. */
+        val picture: Boolean get() = this == Picture || this == PictureFast
+    }
 
     class Output(val count: Int, val signal: Double, val newReps: List<RepMark>, val source: Source)
 
     private var counters = newCounters()
+    private var highPass = List(3) { HighPass() }
     private var tracks = HandTracks(aspect)
     private var t0: Double? = null
     private var tLast = 0.0
@@ -575,11 +664,15 @@ class RepCounter(private val aspect: Double) {
         SignalCounter(RepTuning.GRID_DIM, RepTuning.PICTURE_MIN_RANGE),
         SignalCounter(RepTuning.HAND_DIM, RepTuning.HAND_MIN_RANGE),
         SignalCounter(RepTuning.HAND_DIM, RepTuning.HAND_MIN_RANGE),
+        SignalCounter(RepTuning.GRID_DIM, RepTuning.PICTURE_MIN_RANGE, RepKind.Fast),
+        SignalCounter(RepTuning.HAND_DIM, RepTuning.HAND_MIN_RANGE, RepKind.Fast),
+        SignalCounter(RepTuning.HAND_DIM, RepTuning.HAND_MIN_RANGE, RepKind.Fast),
     )
 
     /** Start a set; everything learned before is forgotten. Times count from the first [push] after this. */
     fun begin() {
         counters = newCounters()
+        highPass = List(3) { HighPass() }
         tracks = HandTracks(aspect)
         t0 = null; tLast = 0.0; lead = 0
         reps.clear(); reported = 0
@@ -588,11 +681,19 @@ class RepCounter(private val aspect: Double) {
     private fun toMark(r: CountedRep) =
         RepMark(Math.rint(r.t * 1000).toInt(), Math.rint(r.dur * 1000).toInt(), Math.rint(r.amp * 100).toInt())
 
-    /** The leader changes only when another counter has more reps; reps beyond those reported come from it. */
+    /**
+     * The leader changes only when another counter has more reps; reps beyond those reported come from it.
+     * A fast counter may lead only with [RepTuning.FAST_MIN_LEAD] reps, [RepTuning.FAST_RATIO] × the best slow
+     * count and an even rhythm: removing the trend also splits slow reps into bumps.
+     */
     private fun report(): List<RepMark> {
         var best = lead
+        var slowBest = 0
+        for (i in 0 until 3) slowBest = max(slowBest, counters[i].count)
         for (i in counters.indices) {
-            if (counters[i].count >= counters[best].count + (if (best == lead) RepTuning.LEAD_MARGIN else 1)) best = i
+            val c = counters[i]
+            if (c.kind === RepKind.Fast && !(c.count >= RepTuning.FAST_MIN_LEAD && c.count >= RepTuning.FAST_RATIO * slowBest && steady(c.reps))) continue
+            if (c.count >= counters[best].count + (if (best == lead) RepTuning.LEAD_MARGIN else 1)) best = i
         }
         lead = best
         val leader = counters[best]
@@ -614,21 +715,55 @@ class RepCounter(private val aspect: Double) {
         return best?.signal() ?: 0.0
     }
 
-    /** [hands]: 0…2 hands as 42 numbers each (x, y of 21 points, 0…1 of the upright picture). [grid]: 768 bytes. */
-    fun push(t: Double, hands: List<FloatArray>, grid: ByteArray): Output {
+    private fun time(t: Double): Double {
         val start = t0 ?: t.also { t0 = it }
         val ts = t - start
-        tLast = ts
-        counters[0].push(ts, RepFeatures.grid(grid), 1.0)
-        for ((k, p) in tracks.assign(hands)) counters[1 + k].push(ts, RepFeatures.hand(p, aspect), RepFeatures.handLength(p, aspect))
+        tLast = max(tLast, ts)
+        return ts
+    }
+
+    /** One frame's picture, 768 bytes, without looking for hands. */
+    fun pushPicture(t: Double, grid: ByteArray): Output {
+        val ts = time(t)
+        val x = RepFeatures.grid(grid)
+        counters[0].push(ts, x, 1.0)
+        counters[3].push(ts, highPass[0].push(ts, x), 1.0)
         val new = report()
         return Output(reported, signal(), new, Source.entries[lead])
     }
 
-    /** End of the set: may add a last rep whose return was cut off. */
+    /** The hands the model found in the frame taken at [t]: 0…2, 42 numbers each (x, y of 21 points, 0…1 of the upright picture). */
+    fun pushHands(t: Double, hands: List<FloatArray>): Output {
+        val ts = time(t)
+        for ((k, p) in tracks.assign(hands)) {
+            val x = RepFeatures.hand(p, aspect)
+            val unit = RepFeatures.handLength(p, aspect)
+            counters[1 + k].push(ts, x, unit)
+            counters[4 + k].push(ts, highPass[1 + k].push(ts, x), unit)
+        }
+        val new = report()
+        return Output(reported, signal(), new, Source.entries[lead])
+    }
+
+    /** Where the set stands, without a new frame. */
+    fun current(): Output = Output(reported, signal(), emptyList(), Source.entries[lead])
+
+    /** One frame: its picture and the hands found in it. */
+    fun push(t: Double, hands: List<FloatArray>, grid: ByteArray): Output {
+        val a = pushPicture(t, grid)
+        val b = pushHands(t, hands)
+        return Output(b.count, b.signal, a.newReps + b.newReps, b.source)
+    }
+
+    /**
+     * End of the set: may add a last rep whose return was cut off. [reps] becomes the leader's own reps
+     * (while counting, reps reported before a change of leader came from the one before).
+     */
     fun end(): Output {
         for (c in counters) c.finish(tLast)
         val new = report()
+        reps.clear()
+        counters[lead].reps.mapTo(reps) { toMark(it) }
         return Output(reported, 0.0, new, Source.entries[lead])
     }
 }

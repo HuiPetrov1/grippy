@@ -3,6 +3,48 @@
 Status: final (run 3, 2026-11-23). Everything below was measured with the files in this folder; what could not be
 verified is listed at the end.
 
+## Run 4 (2026-11-24): quick, small reps
+
+**Why.** The first real set on the phone (wrist extensions with a strap, ~1 rep a second, a few degrees)
+counted 5 in 106 s. The live signal showed ~10 s swings with the quick reps riding on top: the counter
+followed a slower, bigger movement. Two phone-side faults made it worse: the 32x24 grid was made by
+sampling ~4 pixels per cell (`createScaledBitmap`), not averaging the block like the lab's `INTER_AREA`
+(noise ~8x higher, small movements alias into flicker), and the picture ran only as fast as the hand
+model (one thread).
+
+**Changes.**
+- Phone: the grid averages every pixel of its block; the picture is counted on every camera frame (asked
+  for at a steady 30/s) and the hand model runs on its own thread on the newest free frame
+  (`push_picture` / `push_hands`). Traces are v3 (`--bin3` replays exactly what the phone counted).
+- Counter: a second, "fast" counter per signal on the features minus their straight-line trend over the
+  last 1.0 s, counting only reps whose away part lasts 0.15-1.0 s (smoothing 0.06 s, band 0.10). Removing
+  the trend splits slow reps into bumps (1.6-2.3x the true count), so a fast counter may lead only with
+  >= 8 reps, >= 3x the best slow count and an even rhythm (gap spread <= 0.3 of the mean; split slow reps of
+  a gripper set: 0.37+). At the end of a set the reps kept are the leader's own.
+
+**Data** (private testing only, not redistributed): a 46 s wrist-curl burnout of ~83 partial reps at
+2 per second where the fist moves ~1 pixel at 360p (truth from optical flow on the fist: 83 cycles), a
+14.5 s reverse-curl set of 10 reps at 1.4 s, the 21 scored clips sped up 2x and 3x, and synthetic sets
+(40-66 quick reps under a slow sway 0-5x their size; a whole-picture scene swaying +-2 cells with a block
+bobbing 0.6 cell at 1/s).
+
+| | before | after |
+|---|---|---|
+| burnout, ~83 reps (hands seen every 2nd frame) | 13 | **64** |
+| reverse curls, 10 reps | 9 | 9 (slow counter) |
+| synthetic picture sway + 45 quick reps | 0 | **43** |
+| synthetic 40 reps under a sway 1.7x / 5x their size | 0 / 0 | **41 / 40** |
+| 21 clips x base, q320, drop5, ramp, pause, pause4x | as section 3 | **identical** |
+| 21 clips sped up 2x / 3x (exact of 21) | 19 / 16 | 19 / 16 |
+
+Rejected along the way: subtracting the plain 1.5 s mean (0 of 40 under a sway; burnout 36), a 1.5 s or
+2.0 s trend window (burnout 47 / 58, big sway 26 / 3 of 40), fast counters without the lead rule (split
+slow reps: 13 of 21 exact).
+
+**Still open.** The burnout stays ~20 reps short: its fist moves about one pixel and many partials are
+smaller than the band. Nothing here was measured on the user's own sets yet; the phone keeps v3 traces
+for that.
+
 ## 1. Bottom line
 
 - **Recommended method** (reference: `repcounter.py`): three counters run side by side — one on the whole picture

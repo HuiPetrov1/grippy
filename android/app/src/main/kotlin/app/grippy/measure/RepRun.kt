@@ -62,6 +62,9 @@ class RepRun(val request: MeasureRequest) {
         private set
     var tracking by mutableStateOf(Tracking.None)
         private set
+    /** Frames a second the camera phone counts from (0 until it says). */
+    var cameraFps by mutableIntStateOf(0)
+        private set
     /** The hand the camera sees, for the little preview: 21 x, y pairs, or null. */
     var seen by mutableStateOf<FloatArray?>(null)
         private set
@@ -83,7 +86,7 @@ class RepRun(val request: MeasureRequest) {
 
     fun receive(event: CamEvent) {
         when (event) {
-            is CamEvent.Status -> tracking = event.tracking
+            is CamEvent.Status -> { tracking = event.tracking; if (event.fps > 0) cameraFps = event.fps }
             is CamEvent.Frame -> {
                 tracking = event.tracking
                 seen = CamCodec.unpackHand(event.points)

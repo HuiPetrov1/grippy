@@ -15,24 +15,36 @@ import java.util.Locale
 
 /**
  * One file pair per set in `Android/data/app.grippy/files/traces/`:
- * - `<stamp>.bin` (version 2): per frame, big-endian: seconds into the set (float64), hands seen (1 byte,
- *   0…2), 2 × 42 hand numbers (float32: x0, y0 … x20, y20 of each hand as found; zeros for a missing one),
- *   768 brightness bytes. `eval.py --bin2` in the counting lab replays it.
+ * - `<stamp>.bin` (version 3): records in the order the counter got them, big-endian. A picture: kind 0
+ *   (1 byte), seconds into the set (float64), 768 brightness bytes. Hands: kind 1, seconds into the set of
+ *   the frame they were found in (float64), how many (1 byte, 0…2), 42 float32 each (x0, y0 … x20, y20).
+ *   `eval.py --bin3` in the counting lab replays it exactly as the phone counted.
  * - `<stamp>.json`: the exercise, the hand, and what was counted.
  */
 class SetTrace private constructor(private val bin: File, private val meta: File, private val head: String) {
     private var out: DataOutputStream? = DataOutputStream(bin.outputStream().buffered(1 shl 16))
     private var frames = 0
 
-    fun add(t: Double, hands: List<SeenHand>, luma: ByteArray) {
+    fun picture(t: Double, luma: ByteArray) {
         val stream = out ?: return
         if (frames >= MAX_FRAMES) return
         runCatching {
+            stream.writeByte(0)
             stream.writeDouble(t)
-            stream.writeByte(hands.size.coerceAtMost(2))
-            for (k in 0 until 2) for (i in 0 until 42) stream.writeFloat(hands.getOrNull(k)?.points?.getOrNull(i) ?: 0f)
             stream.write(luma, 0, RepFeatures.GRID_DIM)
             frames++
+        }
+    }
+
+    fun hands(t: Double, hands: List<SeenHand>) {
+        val stream = out ?: return
+        if (frames >= MAX_FRAMES) return
+        runCatching {
+            val n = hands.size.coerceAtMost(2)
+            stream.writeByte(1)
+            stream.writeDouble(t)
+            stream.writeByte(n)
+            for (k in 0 until n) for (i in 0 until 42) stream.writeFloat(hands[k].points.getOrNull(i) ?: 0f)
         }
     }
 
@@ -65,7 +77,7 @@ class SetTrace private constructor(private val bin: File, private val meta: File
             val dir = File(context.getExternalFilesDir(null) ?: context.filesDir, "traces").apply { mkdirs() }
             val stamp = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date())
             val name = exercise.replace("\\", " ").replace("\"", "'")
-            val head = "\"version\":2,\"aspect\":$aspect,\"at\":\"$stamp\",\"exercise\":\"$name\",\"hand\":\"${hand.key}\",\"frontCamera\":$front," +
+            val head = "\"version\":3,\"aspect\":$aspect,\"at\":\"$stamp\",\"exercise\":\"$name\",\"hand\":\"${hand.key}\",\"frontCamera\":$front," +
                 "\"grid\":[${RepFeatures.GRID_W},${RepFeatures.GRID_H}]"
             SetTrace(File(dir, "$stamp.bin"), File(dir, "$stamp.json"), head)
         }.getOrNull()

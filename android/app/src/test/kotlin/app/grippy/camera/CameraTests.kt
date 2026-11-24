@@ -119,6 +119,37 @@ class RepCounterTests {
         return counter
     }
 
+    /**
+     * The user's case: wrist extensions about once a second with a short range, while the arm or body sways
+     * slowly and much further. The slow counter follows the sway; the fast one (high-passed) counts the reps.
+     */
+    @Test
+    fun quickSmallRepsOnASlowSwayAreCountedByTheFastCounter() {
+        val sway = DoubleArray(dim) { random.nextDouble() - .5 }.also { d ->
+            val norm = kotlin.math.sqrt(d.sumOf { it * it })
+            for (i in d.indices) d[i] /= norm
+        }
+        val slow = SignalCounter(dim, 0.05)
+        val fast = SignalCounter(dim, 0.05, RepKind.Fast)
+        val highPass = HighPass()
+        val fps = 30
+        val reps = 40
+        var t = 0.0
+        repeat(2 * fps) { val x = frame(0.0); slow.push(t, x, 1.0); fast.push(t, highPass.push(t, x), 1.0); t += 1.0 / fps }
+        val start = t
+        for (i in 0 until reps * fps) {
+            val rep = 0.12 * (1 - kotlin.math.cos(2 * PI * i / fps)) / 2
+            val x = frame(rep).also { v -> for (k in v.indices) v[k] += sway[k] * 0.6 * kotlin.math.sin(2 * PI * (t - start) / 9.0) }
+            slow.push(t, x, 1.0)
+            fast.push(t, highPass.push(t, x), 1.0)
+            t += 1.0 / fps
+        }
+        repeat(2 * fps) { val x = frame(0.0); slow.push(t, x, 1.0); fast.push(t, highPass.push(t, x), 1.0); t += 1.0 / fps }
+        slow.finish(t); fast.finish(t)
+        assertTrue("fast counted ${fast.count} of $reps", fast.count in reps - 1..reps + 1)
+        assertTrue("slow counted ${slow.count}: it should follow the sway, not the reps", slow.count < reps / 2)
+    }
+
     @Test
     fun tenSteadyRepsAreTen() {
         assertEquals(10, play(10, period = 1.6, range = 0.5, fps = 30).count)
@@ -172,7 +203,8 @@ class RepCounterTests {
 }
 
 /**
- * The port against the reference: the features of 22 real clips replayed frame by frame must give the
+ * The port against the reference: the features of 22 real clips (plus 3 quick-rep sets where the hands are
+ * looked for only every 2nd or 3rd frame, as on the phone) replayed frame by frame must give the
  * reference's counts, reps and signal. The fixtures come from the counting lab (`kotlin_fixtures/`, made
  * from internet exercise videos, so they are not kept in this repository): set GRIPPY_REPLAB to that
  * folder to run this; without it the test does nothing.
@@ -201,14 +233,22 @@ class RepCounterReferenceTests {
             for (i in 0 until frames) {
                 val t = input.readDouble()
                 val n = input.readUnsignedByte()
-                val hands = List(2) { FloatArray(42) { input.readFloat() } }.take(n)
+                val hands = List(2) { FloatArray(42) { input.readFloat() } }
                 val grid = ByteArray(RepTuning.GRID_DIM).also { input.readFully(it) }
-                val out = counter.push(t, hands, grid)
+                // 255: the hand model did not look at this frame (the phone's picture runs faster than it).
+                val out = if (n == 255) counter.pushPicture(t, grid) else counter.push(t, hands.take(n), grid)
                 worstSignal = maxOf(worstSignal, abs(out.signal - signal[i]))
                 if (abs(out.signal - signal[i]) > 1e-3) problems += "$name frame $i: signal ${out.signal} vs ${signal[i]}"
             }
             val last = counter.end()
-            val sourceName = when (last.source) { RepCounter.Source.Picture -> "picture"; RepCounter.Source.HandA -> "hand A"; else -> "hand B" }
+            val sourceName = when (last.source) {
+                RepCounter.Source.Picture -> "picture"
+                RepCounter.Source.HandA -> "hand A"
+                RepCounter.Source.HandB -> "hand B"
+                RepCounter.Source.PictureFast -> "picture fast"
+                RepCounter.Source.HandAFast -> "hand A fast"
+                RepCounter.Source.HandBFast -> "hand B fast"
+            }
             if (last.count != count.toInt()) problems += "$name: count ${last.count} vs $count"
             if (counter.perSignal != perSignal) problems += "$name: per signal ${counter.perSignal} vs $perSignal"
             if (sourceName != lines[0].substringAfter(' ')) problems += "$name: source $sourceName vs ${lines[0].substringAfter(' ')}"

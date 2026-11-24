@@ -5,7 +5,8 @@ usage:
   eval.py base ramp       only those variants
   eval.py --expected      also (re)write expected/<clip>.json from the base variant
   eval.py --bin FILE.bin [aspect]   replay one phone trace (current v1 format) and print its reps
-  eval.py --bin2 FILE.bin [aspect]  same for the recommended v2 format (all hands; see read_phone_bin2)
+  eval.py --bin2 FILE.bin [aspect]  same for the v2 format (all hands; see read_phone_bin2)
+  eval.py --bin3 FILE.bin [aspect]  the current v3 format: pictures and hands as the phone counted them
 
 Variants: base (15 fps, 640-wide source), q320 (picture shrunk to 320 wide before the hand detector),
 drop5 (every 5th frame dropped), ramp (brightness 1.0 -> 0.55 -> 1.30, auto-exposure stress), pause
@@ -151,7 +152,40 @@ def read_phone_bin2(path, aspect=0.75):
     return dict(t=t, n_hands=nh, hands=hands, grid=grid, aspect=aspect)
 
 
+def replay_phone_bin3(path, aspect=0.75):
+    """Phone trace v3 (SetTrace.kt), big-endian records in the order the phone's counter got them:
+    kind 0 = picture: float64 t, 768 uint8; kind 1 = hands: float64 t (of the frame they were found in),
+    uint8 n, n x 42 float32. Replayed through push_picture / push_hands exactly as on the phone."""
+    data = open(path, "rb").read()
+    rc = R.RepCounter(aspect)
+    rc.begin()
+    o = 0; pictures = 0; looks = 0; found = 0; reported_at = []; t = 0.0
+    while o < len(data):
+        kind = data[o]; t = struct.unpack_from(">d", data, o + 1)[0]; o += 9
+        if kind == 0:
+            out = rc.push_picture(t, np.frombuffer(data, np.uint8, 768, o)); o += 768; pictures += 1
+        elif kind == 1:
+            n = data[o]; o += 1
+            hands = [np.array(struct.unpack_from(">42f", data, o + 168 * k), np.float32) for k in range(n)]
+            o += 168 * n
+            out = rc.push_hands(t, hands); looks += 1; found += n > 0
+        else:
+            raise ValueError(f"unknown record {kind} at byte {o - 9}")
+        reported_at += [t] * len(out.new_reps)
+    rc.end()
+    return rc, pictures, looks, found, t
+
+
 def main(args):
+    if args and args[0] == "--bin3":
+        aspect = float(args[2]) if len(args) > 2 else 0.75
+        rc, pictures, looks, found, t = replay_phone_bin3(args[1], aspect)
+        print(f"{args[1]}: {t:.1f} s, pictures {pictures} ({pictures / max(t, 1e-9):.1f}/s), hand looks {looks} "
+              f"({looks / max(t, 1e-9):.1f}/s, a hand in {found}), count {rc.reported_count} via {R.SOURCES[rc.lead]} "
+              f"(per counter {[c.count for c in rc.counters]})")
+        for rep in rc.reps:
+            print(f"  rep finish {rep.finish_ms / 1000:7.2f} s  duration {rep.duration_ms} ms  amplitude {rep.amplitude_pct}%")
+        return
     if args and args[0] in ("--bin", "--bin2"):
         reader = read_phone_bin if args[0] == "--bin" else read_phone_bin2
         tr = reader(args[1], float(args[2]) if len(args) > 2 else 0.75)

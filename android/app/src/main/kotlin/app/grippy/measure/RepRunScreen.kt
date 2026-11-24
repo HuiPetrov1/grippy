@@ -269,9 +269,20 @@ private fun RepCounting(run: RepRun) {
     Spacer(Modifier.height(10.dp))
     TrackingPill(run.tracking, counting = true)
     Spacer(Modifier.height(8.dp))
-    Text(if (run.count == 0) "The count shows after your 3rd rep. Press Stop when the set is done." else "Press Stop when the set is done.",
+    Text(if (run.count == 0) "The count shows after your 3rd rep (quick small reps: about the 8th). Press Stop when the set is done." else "Press Stop when the set is done.",
         style = textStyle(13.5.sp, FontWeight.Normal, c.text3), textAlign = TextAlign.Center)
+    if (run.cameraFps > 0) {
+        Spacer(Modifier.height(4.dp))
+        val slow = run.cameraFps < SLOW_CAMERA_FPS
+        Text(
+            if (slow) "Camera at ${run.cameraFps} frames/s. More light lets it see quick reps." else "Camera at ${run.cameraFps} frames/s",
+            style = textStyle(12.5.sp, FontWeight.Normal, if (slow) RepAmber else c.text3), textAlign = TextAlign.Center,
+        )
+    }
 }
+
+/** Below this the camera phone misses the turn of a rep that takes under a second. */
+private const val SLOW_CAMERA_FPS = 20
 
 /** After counting: the numbers (the count can be corrected), and which exercise they belong to. */
 @Composable

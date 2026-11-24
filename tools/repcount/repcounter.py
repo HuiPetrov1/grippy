@@ -12,8 +12,12 @@ Kotlin port is line-for-line). No scipy / sklearn. Every frame is used once, in 
         grid : 768 uint8 = the whole picture shrunk to 32 columns x 24 rows of brightness, row-major
         -> Output(count, signal (-1..1), new_reps [Rep(finish_ms, duration_ms, amplitude_pct)], source)
     summary = rc.end()                  # end of the set: may add a last rep (see Counter.finish)
+    The phone looks for hands less often than it shrinks the picture; it then calls
+    rc.push_picture(t, grid) on every frame and rc.push_hands(t, hands) on the frames the hand model saw
+    (push() is both at once).
 
-How it counts (per signal; there are three signals: the whole picture, hand track A, hand track B):
+How it counts (per signal; there are three signals: the whole picture, hand track A, hand track B; each is
+counted twice, once as it is and once "fast": see FAST below):
   1. Each frame becomes a vector (picture: 768 normalised brightness values; hand: 20 landmarks relative
      to the wrist).
   2. Every 0.4 s the direction of greatest change over the last 6 s is found (principal axis by power
@@ -24,7 +28,7 @@ How it counts (per signal; there are three signals: the whole picture, hand trac
   4. COUNTING (locked): every frame is projected on the locked axis; a rep is counted the frame the signal
      comes back to its home side, if it was long and big enough compared with the reps so far. The axis
      follows slow changes, but only while the movement is as big as usual (a pause or a hold cannot move it).
-  5. The set's count is the HIGHEST count of the three signals; the signal shown and the reps reported
+  5. The set's count is the HIGHEST count of the six counters; the signal shown and the reps reported
      follow the one that leads (the picture misses movements of a small hand; a hand track misses frames
      where the hand is not recognised, and a still helper hand never locks at all).
 Times, durations and the amplitude are reported per rep; the amplitude is % of the set's usual swing.
@@ -105,6 +109,85 @@ LEAD_MARGIN = 1        # another signal takes the lead when it has this many mor
                        # Sweep: 2 left 2 clips one short on ramp; 1 = plain maximum.
 EPS = 1e-12
 
+# FAST counters (run 4, 2026-11-24). Small, quick reps (wrist extensions with a strap, ~1 per second, a few
+# degrees) ride on slower, bigger movement (arm, body, the hanging weight): the slow counters then follow the
+# slow movement (a synthetic sway 1.7x the size of 40 reps: 0 counted) or reject reps whose away part lasts
+# under MIN_REP_SEC. A second counter per signal therefore sees the features minus their straight-line trend
+# over the last HIGH_PASS_SEC, and counts only short reps. Removing the trend also turns each turn of a slow rep
+# into a short bump, so a fast counter may lead only when it clearly sees something else: at least
+# FAST_MIN_LEAD reps, FAST_RATIO times the best slow count, at an even rhythm. Picked on a 46 s burnout set of
+# ~83 tiny 2-per-second partials (the fist moves ~1 pixel at 360p; 13 counted before, 64 after), a
+# 1.4 s-per-rep reverse-curl set (9 of 10, by the slow picture counter) and synthetic sways; every result of
+# the 21 clips x 6 variants above is unchanged. See REPORT.md "Run 4".
+HIGH_PASS_SEC = 1.0    # trend window. Burnout 64 (1.0) / 47 (1.5); sway 0.6: 40 of 40 (1.0) / 26 (1.5) / 3 (2.0).
+                       # Subtracting the plain mean instead of the trend left half of a slow sway: 0 of 40.
+FAST_MIN_REP_SEC = 0.15   # the away part of a 2-per-second rep lasts ~0.3 s: 0.35 rejected half of them.
+FAST_MAX_REP_SEC = 1.0    # longer away parts are left to the slow counters.
+FAST_SMOOTH_SEC = 0.06    # 0.12 damps a 2 Hz swing by half (burnout 18 vs 36 in the first trials).
+FAST_SWING = 0.10         # burnout 54 (0.15) / 64 (0.10) / 69 (0.07).
+FAST_MIN_LEAD = 8         # reps a fast counter needs before it may lead (and the rhythm is judged over).
+FAST_RATIO = 3.0          # ... and this many times the best slow count. Split slow reps reach 1.6-2.3x.
+FAST_MAX_CV = 0.3         # ... and its last FAST_MIN_LEAD reps evenly spaced: gap spread <= 0.3 of the mean
+                          # gap. The burnout and the sways: 0.07-0.14; a gripper set's squeeze/release: 0.37+.
+
+
+def steady(reps):
+    """The last FAST_MIN_LEAD reps came at an even rhythm."""
+    if len(reps) < FAST_MIN_LEAD:
+        return False
+    t = [r["t"] for r in reps[-FAST_MIN_LEAD:]]
+    gaps = [t[i + 1] - t[i] for i in range(len(t) - 1)]
+    m = sum(gaps) / len(gaps)
+    if m <= 0:
+        return False
+    sd = math.sqrt(sum((g - m) * (g - m) for g in gaps) / len(gaps))
+    return sd <= FAST_MAX_CV * m
+
+
+class Kind:
+    """The limits one counter works with."""
+
+    def __init__(self, min_rep, max_rep, smooth_sec, swing):
+        self.min_rep = min_rep
+        self.max_rep = max_rep
+        self.smooth_sec = smooth_sec
+        self.swing = swing
+
+
+SLOW = Kind(MIN_REP_SEC, MAX_REP_SEC, SMOOTH_SEC, SWING)
+FAST = Kind(FAST_MIN_REP_SEC, FAST_MAX_REP_SEC, FAST_SMOOTH_SEC, FAST_SWING)
+
+
+class HighPass:
+    """A feature vector minus the straight line that best fits the vectors pushed over the last HIGH_PASS_SEC
+    (this one included), taken at its time: slow movement, even a steady drift, is removed."""
+
+    def __init__(self):
+        self.T = []
+        self.X = []
+        self.sum = None
+
+    def __call__(self, t, x):
+        self.T.append(t)
+        self.X.append(x)
+        self.sum = x.copy() if self.sum is None else self.sum + x
+        while len(self.T) > 1 and t - self.T[0] > HIGH_PASS_SEC:
+            self.sum = self.sum - self.X[0]
+            self.T.pop(0)
+            self.X.pop(0)
+        n = len(self.T)
+        tm = sum(self.T) / n
+        xm = self.sum / n
+        stt = 0.0
+        stx = np.zeros(len(x))
+        for tt, xx in zip(self.T, self.X):
+            d = tt - tm
+            stt += d * d
+            stx = stx + (xx - xm) * d
+        if stt <= 0:
+            return x - xm
+        return x - (xm + stx * ((t - tm) / stt))
+
 
 def median(values):
     """Plain median (mean of the two middle values for an even count)."""
@@ -157,12 +240,13 @@ class Sides:
     """Which side of the middle band the signal u (centred, in ranges) is on. step() returns
     (new_side, extreme reached on the side just left) when it changes side, else None."""
 
-    def __init__(self):
+    def __init__(self, swing=SWING):
+        self.swing = swing
         self.side = 0
         self.ext = 0.0
 
     def step(self, u):
-        now = 1 if u > SWING else (-1 if u < -SWING else 0)
+        now = 1 if u > self.swing else (-1 if u < -self.swing else 0)
         if self.side == 0:
             if now != 0:
                 self.side = now
@@ -187,7 +271,8 @@ class Counter:
     """Counts reps in one stream of feature vectors. push() may be skipped on frames where the signal
     is not available (hand not seen); time gaps are fine."""
 
-    def __init__(self, dim, min_range):
+    def __init__(self, dim, min_range, kind=SLOW):
+        self.kind = kind
         self.dim = dim
         self.min_range = min_range
         self.T = []          # buffered times (<= BUFFER_SEC)
@@ -203,7 +288,7 @@ class Counter:
         self.axis = None; self.mean = None; self.mid = 0.0; self.range = 0.0; self.home = 0
         self.smooth = None
         self.last_t = None
-        self.sides = Sides()
+        self.sides = Sides(self.kind.swing)
         self.was_home = False
         self.left_home_at = None
         self.prev_home_ext = None
@@ -233,7 +318,7 @@ class Counter:
     def push(self, t, x, unit):
         out = []
         dt = max(t - self.last_t, 0.0) if self.last_t is not None else 0.0
-        k = 1.0 - math.exp(-dt / SMOOTH_SEC)
+        k = 1.0 - math.exp(-dt / self.kind.smooth_sec)
         self.T.append(t); self.X.append(x); self.U.append(unit)
         while len(self.T) > 2 and t - self.T[0] > BUFFER_SEC:
             self.T.pop(0); self.X.pop(0); self.U.pop(0)
@@ -307,16 +392,15 @@ class Counter:
             if sm is None:
                 sm = raw
             else:
-                sm += (raw - sm) * (1.0 - math.exp(-(t - lt) / SMOOTH_SEC))
+                sm += (raw - sm) * (1.0 - math.exp(-(t - lt) / self.kind.smooth_sec))
             lt = t
             out.append((t, (sm - mid) / rng))
         return out, sm
 
-    @staticmethod
-    def _cycles(series, home):
+    def _cycles(self, series, home):
         """Reps in a series: leave the home side, reach the other side, come back. If the series starts in
         the middle band and first goes to the far side, the first arrival home is a rep too."""
-        sides = Sides()
+        sides = Sides(self.kind.swing)
         reps = []
         left = None
         prev_ext = None
@@ -324,8 +408,8 @@ class Counter:
         neutral_start = None
         for t, u in series:
             if neutral_start is None:
-                neutral_start = abs(u) <= SWING
-            at_home = u * home > SWING
+                neutral_start = abs(u) <= self.kind.swing
+            at_home = u * home > self.kind.swing
             if was_home and not at_home:
                 left = t
             was_home = at_home
@@ -422,7 +506,7 @@ class Counter:
         lt = None
         for tt, x in zip(self.T[-RESMOOTH_FRAMES:], self.X[-RESMOOTH_FRAMES:]):
             raw = float(np.dot(x - mean, axis))
-            sm = raw if sm is None else sm + (raw - sm) * (1.0 - math.exp(-(tt - lt) / SMOOTH_SEC))
+            sm = raw if sm is None else sm + (raw - sm) * (1.0 - math.exp(-(tt - lt) / self.kind.smooth_sec))
             lt = tt
         return sm
 
@@ -436,7 +520,7 @@ class Counter:
         series, sm = self._series(mean, v, mid, rng, self.last_rep_at)
         best = None
         for home in (1, -1):
-            reps = [r for r in self._cycles(series, home) if MIN_REP_SEC <= r["active"] <= MAX_REP_SEC]
+            reps = [r for r in self._cycles(series, home) if self.kind.min_rep <= r["active"] <= self.kind.max_rep]
             run = self._alike_run(reps)
             if len(run) >= CONFIRM_REPS and t - run[-1]["t"] <= MAX_GAP_SEC:
                 if best is None or run[0]["start"] < best[1][0]["start"]:
@@ -451,7 +535,7 @@ class Counter:
             self.typ_dur.append(r["active"])
         out = [self._emit(r["t"], r["active"], r["amp"] * rng) for r in run]
         # bring the live state machine to where the replay is now
-        self.sides = Sides(); self.smooth = sm; self.left_home_at = None; self.was_home = False
+        self.sides = Sides(self.kind.swing); self.smooth = sm; self.left_home_at = None; self.was_home = False
         self.prev_home_ext = None; self.away_at = None
         for tt, u in series:
             if tt > run[-1]["t"]:
@@ -473,7 +557,7 @@ class Counter:
 
     def _advance(self, t, u):
         home = self.home
-        at_home = u * home > SWING
+        at_home = u * home > self.kind.swing
         if self.was_home and not at_home:
             self.left_home_at = t
         self.was_home = at_home
@@ -492,7 +576,7 @@ class Counter:
         amp_abs = abs(ext - self.prev_home_ext) * self.range
         typ_a = median(self.typ_amp[-TYPICAL_OF_LAST:])
         typ_d = median(self.typ_dur[-TYPICAL_OF_LAST:])
-        if active < max(MIN_REP_SEC, MIN_REL_DUR * typ_d) or active > MAX_REP_SEC:
+        if active < max(self.kind.min_rep, MIN_REL_DUR * typ_d) or active > self.kind.max_rep:
             return None
         if not (MIN_REL_AMP * typ_a <= amp_abs <= MAX_REL_AMP * typ_a):
             return None
@@ -593,7 +677,7 @@ class Output:
         self.source = source
 
 
-SOURCES = ("picture", "hand A", "hand B")
+SOURCES = ("picture", "hand A", "hand B", "picture fast", "hand A fast", "hand B fast")
 
 
 class RepCounter:
@@ -605,7 +689,11 @@ class RepCounter:
         """Start a set. Everything learned before is forgotten."""
         self.counters = [Counter(GRID_DIM, PICTURE_MIN_RANGE),
                          Counter(HAND_DIM, HAND_MIN_RANGE),
-                         Counter(HAND_DIM, HAND_MIN_RANGE)]
+                         Counter(HAND_DIM, HAND_MIN_RANGE),
+                         Counter(GRID_DIM, PICTURE_MIN_RANGE, FAST),
+                         Counter(HAND_DIM, HAND_MIN_RANGE, FAST),
+                         Counter(HAND_DIM, HAND_MIN_RANGE, FAST)]
+        self.high_pass = [HighPass(), HighPass(), HighPass()]
         self.tracks = HandTracks(self.aspect)
         self.t0 = None
         self.t_last = 0.0
@@ -617,10 +705,14 @@ class RepCounter:
         return Rep(int(round(r["t"] * 1000)), int(round(r["dur"] * 1000)), int(round(r["amp"] * 100)))
 
     def _report(self):
-        """Count = highest count of the three counters. The leader changes only when another counter has
+        """Count = highest count of the counters allowed to lead (a fast one only with FAST_MIN_LEAD reps,
+        FAST_RATIO x the best slow count and an even rhythm). The leader changes only when another counter has
         MORE reps (ties keep the current one). Reps beyond what was already reported come from the leader."""
         best = self.lead
+        slow_best = max(c.count for c in self.counters[:3])
         for i, c in enumerate(self.counters):
+            if c.kind is FAST and not (c.count >= FAST_MIN_LEAD and c.count >= FAST_RATIO * slow_best and steady(c.reps)):
+                continue
             if c.count >= self.counters[best].count + (LEAD_MARGIN if best == self.lead else 1):
                 best = i
         self.lead = best
@@ -644,21 +736,45 @@ class RepCounter:
                 best = c
         return best.signal() if best is not None else 0.0
 
-    def push(self, t, hands, grid):
+    def _time(self, t):
         if self.t0 is None:
             self.t0 = t
         ts = t - self.t0
-        self.t_last = ts
-        self.counters[0].push(ts, grid_features(grid), 1.0)
-        for k, pts in self.tracks.assign(hands):
-            self.counters[1 + k].push(ts, hand_features(pts, self.aspect), hand_length(pts, self.aspect))
+        self.t_last = max(self.t_last, ts)
+        return ts
+
+    def push_picture(self, t, grid):
+        """One frame's picture (768 bytes) without looking for hands."""
+        ts = self._time(t)
+        x = grid_features(grid)
+        self.counters[0].push(ts, x, 1.0)
+        self.counters[3].push(ts, self.high_pass[0](ts, x), 1.0)
         new = self._report()
         return Output(self.reported_count, self._signal(), new, SOURCES[self.lead])
 
+    def push_hands(self, t, hands):
+        """The hands the model found in the frame taken at t (0..2, possibly none)."""
+        ts = self._time(t)
+        for k, pts in self.tracks.assign(hands):
+            x = hand_features(pts, self.aspect)
+            unit = hand_length(pts, self.aspect)
+            self.counters[1 + k].push(ts, x, unit)
+            self.counters[4 + k].push(ts, self.high_pass[1 + k](ts, x), unit)
+        new = self._report()
+        return Output(self.reported_count, self._signal(), new, SOURCES[self.lead])
+
+    def push(self, t, hands, grid):
+        """One frame: the picture and the hands found in it."""
+        a = self.push_picture(t, grid)
+        b = self.push_hands(t, hands)
+        return Output(b.count, b.signal, a.new_reps + b.new_reps, b.source)
+
     def end(self):
         """End of the set. Returns an Output whose new_reps holds a last rep if one was cut off (see
-        Counter.finish); all reps of the set are in self.reps. Call begin() before the next set."""
+        Counter.finish). self.reps becomes the leader's own reps (while counting, the reps reported before a
+        change of leader came from the one before). Call begin() before the next set."""
         for c in self.counters:
             c.finish(self.t_last)
         new = self._report()
+        self.reps = [self._to_rep(r) for r in self.counters[self.lead].reps]
         return Output(self.reported_count, 0.0, new, SOURCES[self.lead])

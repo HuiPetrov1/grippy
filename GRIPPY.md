@@ -49,20 +49,24 @@ Two phones, both with Grippy. One stands still and watches; the other is the one
   like any measurement; the count can be corrected before saving.
 - **What crosses between the phones:** the count, each rep's time, the hand as 21 points for
   a small preview, and a movement signal. No pictures or video leave the camera phone.
-- **How it counts:** MediaPipe's hand model (Apache-2.0, bundled as
-  `assets/hand_landmarker.task`, runs on the phone) gives up to two hands. Three counters run side by
-  side (`RepCounter.kt`): one on the whole picture shrunk to 32×24, one per hand. Each learns the
-  direction the movement goes, waits for 3 alike reps, then counts every return home; the set's
-  count is the highest of the three. It is a port of `tools/repcount/repcounter.py`, which was
-  measured on 21 real exercise clips (`tools/repcount/REPORT.md`: 19 exact, 1 off by one, 1 wrong);
-  `RepCounterReferenceTests` checks the port against it when `GRIPPY_REPLAB` points at the lab's
-  fixtures.
+- **How it counts:** the camera runs at up to 30 frames a second; every frame is shrunk to a 32×24
+  brightness grid (each cell the average of its block of pixels). MediaPipe's hand model (Apache-2.0,
+  bundled as `assets/hand_landmarker.task`, runs on the phone, on its own thread) looks at the newest
+  frame whenever it is free and gives up to two hands. Six counters run side by side (`RepCounter.kt`):
+  the picture, hand A and hand B, each counted as it is and "fast" (minus its 1-second trend, short reps
+  only: small quick reps riding on a slower sway of the arm or body). Each learns the direction the
+  movement goes, waits for 3 alike reps, then counts every return home; the set's count is the highest,
+  and a fast counter only counts once it has 8 evenly spaced reps and 3× the best slow count. It is a
+  port of `tools/repcount/repcounter.py`, measured on 21 real exercise clips plus quick-rep sets
+  (`tools/repcount/REPORT.md`); `RepCounterReferenceTests` checks the port against it when
+  `GRIPPY_REPLAB` points at the lab's fixtures.
 - **Framing:** phone on a stand; the working forearm and hand large in the picture (a third to half
   of it); the hand visible, not hidden behind the weight; background and the other hand still. The
-  count appears after the 3rd rep; sets of 1–2 reps are not counted.
+  count appears after the 3rd rep (quick small reps on a sway: about the 8th); sets of 1–2 reps are not
+  counted. The main phone shows the camera's frame rate; below 20 a second, give it more light.
 - **Tuning data:** with "Keep each set's measurements" on, the camera phone writes each set to
   `Android/data/app.grippy/files/traces/` as numbers only (format in `SetTrace.kt`).
-  `adb pull` them and replay one with `tools/repcount/eval.py --bin2`.
+  `adb pull` them and replay one with `tools/repcount/eval.py --bin3` (exactly as the phone counted).
 - **Testing without the main phone:** `scripts/grippy-camtest.py` plays the main phone from a
   PC with Bluetooth: `grippy-camtest.py set 30` wakes the camera, counts for 30 s and prints
   the reps.

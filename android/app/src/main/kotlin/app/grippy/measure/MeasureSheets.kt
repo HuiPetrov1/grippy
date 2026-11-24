@@ -397,7 +397,7 @@ fun HandSheet(nav: MeasureNavigator, context: StartContext) {
                 Spacer(Modifier.height(12.dp))
                 Text(
                     "Your camera phone wakes up and counts. \"Start after\" is the time you have to get in position. " +
-                        "The count shows after your 3rd rep (the first three arrive together). Press Stop when the set is done.",
+                        "The count shows after your 3rd rep, the first three together; for quick small reps after about the 8th. Press Stop when the set is done.",
                     style = textStyle(13.5.sp, FontWeight.Normal, c.text2),
                 )
             }

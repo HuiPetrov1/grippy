@@ -119,7 +119,7 @@ fun CameraScreen(
                         modifier = Modifier.semantics { contentDescription = "$n reps" },
                     )
                 }
-                val line = if (counting && ui.count == 0) "counts after your 3rd rep" else if (counting) "reps · ${ui.elapsed.toInt()} s" else ui.last?.let { "reps in ${(it.durationMs / 1000.0).toInt()} s · done" } ?: ""
+                val line = if (counting && ui.count == 0) "counts after a few reps" else if (counting) "reps · ${ui.elapsed.toInt()} s" else ui.last?.let { "reps in ${(it.durationMs / 1000.0).toInt()} s · done" } ?: ""
                 Pill(line, Color.White, Scrim, 20)
             }
         }
@@ -135,9 +135,9 @@ fun CameraScreen(
             }
             Text(
                 when {
-                    listeners > 0 && counting -> "Counting for your main phone · ${ui.fps} frames/s"
-                    listeners > 0 -> "Connected to your main phone · ${ui.fps} frames/s"
-                    else -> "Main phone not connected · ${ui.fps} frames/s"
+                    listeners > 0 && counting -> "Counting for your main phone · ${rate(ui)}"
+                    listeners > 0 -> "Connected to your main phone · ${rate(ui)}"
+                    else -> "Main phone not connected · ${rate(ui)}"
                 },
                 style = textStyle(13.5.sp, FontWeight.Medium, Soft),
                 modifier = Modifier.clip(CircleShape).background(Scrim).padding(horizontal = 12.dp, vertical = 6.dp),
@@ -156,6 +156,8 @@ fun CameraScreen(
         }
     }
 }
+
+private fun rate(ui: CameraUi) = "${ui.fps} frames/s · hand ${ui.handFps}/s"
 
 @Composable
 private fun Pill(text: String, color: Color, background: Color, size: Int) {
