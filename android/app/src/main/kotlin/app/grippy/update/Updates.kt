@@ -11,6 +11,7 @@ import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.core.content.FileProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
+import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlin.time.Duration.Companion.minutes
@@ -48,6 +50,10 @@ sealed interface UpdateState {
  * Checks the releases repo when the app comes to the front and installs a new build with one tap.
  * On Android 12+ every update after the first one installs without a confirmation screen, because
  * Grippy is then its own installer of record.
+ *
+ * Xiaomi's system (MIUI / HyperOS) aborts app-driven installs ("INSTALL_FAILED_ABORTED: Permission
+ * denied") whatever the user allowed. There, and on any phone where that has happened once, the APK is
+ * handed to Android's own installer screen instead: one more tap, but it goes through.
  */
 object UpdateManager {
     const val MANIFEST_URL = "https://github.com/HuiPetrov1/grippy-releases/releases/latest/download/update.json"
@@ -96,21 +102,54 @@ object UpdateManager {
             _state.value = UpdateState.Failed("Allow Grippy to install updates, then tap Update again.", update)
             return
         }
+        val withScreen = useInstallerScreen(app)
         scope.launch {
             _state.value = UpdateState.Downloading(update, 0f)
             runCatching {
-                withContext(Dispatchers.IO) {
-                    downloadAndCommit(app, update) { p -> _state.value = UpdateState.Downloading(update, p) }
+                val apk = withContext(Dispatchers.IO) {
+                    download(app, update) { p -> _state.value = UpdateState.Downloading(update, p) }
                 }
-            }.onSuccess { _state.value = UpdateState.Installing(update) }
+                if (withScreen) {
+                    openInstallerScreen(context, apk)
+                    // If the screen is backed out of, the update is still there to install.
+                    UpdateState.Available(update)
+                } else {
+                    withContext(Dispatchers.IO) { commit(app, apk) }
+                    UpdateState.Installing(update)
+                }
+            }.onSuccess { _state.value = it }
                 .onFailure { _state.value = UpdateState.Failed("Update failed: ${it.message ?: it::class.simpleName}", update) }
         }
     }
 
     /** Called by [InstallResultReceiver] when the system reports the install didn't go through. */
-    internal fun installFailed(message: String) {
+    internal fun installFailed(context: Context, message: String) {
         val update = (_state.value as? UpdateState.Installing)?.update
+        if ("INSTALL_FAILED_ABORTED" in message) {
+            // The system refuses installs started by an app: from now on use its installer screen.
+            prefs(context).edit().putBoolean(KEY_SCREEN, true).apply()
+            _state.value = UpdateState.Failed("This phone blocks quick updates. Tap Retry to install with Android's installer.", update)
+            return
+        }
         _state.value = UpdateState.Failed(message, update)
+    }
+
+    private const val KEY_SCREEN = "installerScreen"
+
+    private fun prefs(context: Context) = context.applicationContext.getSharedPreferences("grippy_update", Context.MODE_PRIVATE)
+
+    /** Xiaomi, Redmi and POCO phones abort app-driven installs; so does any phone where it already happened. */
+    private fun useInstallerScreen(context: Context): Boolean {
+        val maker = "${Build.MANUFACTURER} ${Build.BRAND}".lowercase()
+        return listOf("xiaomi", "redmi", "poco").any { it in maker } || prefs(context).getBoolean(KEY_SCREEN, false)
+    }
+
+    private fun openInstallerScreen(context: Context, apk: File) {
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", apk)
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 
     private fun fetchManifest(): UpdateInfo? {
@@ -133,8 +172,11 @@ object UpdateManager {
         }
     }
 
-    private fun downloadAndCommit(context: Context, update: UpdateInfo, onProgress: (Float) -> Unit) {
-        val installer = context.packageManager.packageInstaller
+    /** Downloads the APK to `<cache>/updates/grippy.apk` (the only update kept). */
+    private fun download(context: Context, update: UpdateInfo, onProgress: (Float) -> Unit): File {
+        val dir = File(context.cacheDir, "updates").apply { mkdirs() }
+        val apk = File(dir, "grippy.apk")
+        val part = File(dir, "grippy.apk.part")
         val connection = (URL(update.apkUrl).openConnection() as HttpURLConnection).apply {
             instanceFollowRedirects = true
             connectTimeout = 30_000
@@ -143,45 +185,57 @@ object UpdateManager {
         try {
             if (connection.responseCode !in 200..299) error("download failed (HTTP ${connection.responseCode})")
             val total = connection.contentLengthLong
-            val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
-                setAppPackageName(context.packageName)
-                if (total > 0) setSize(total)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
-                }
-            }
-            val sessionId = installer.createSession(params)
-            installer.openSession(sessionId).use { session ->
-                session.openWrite("grippy.apk", 0, total).use { out ->
-                    connection.inputStream.use { input ->
-                        val buffer = ByteArray(64 * 1024)
-                        var written = 0L
-                        var lastPercent = -1
-                        while (true) {
-                            val read = input.read(buffer)
-                            if (read < 0) break
-                            out.write(buffer, 0, read)
-                            written += read
-                            if (total > 0) {
-                                val percent = (written * 100 / total).toInt()
-                                if (percent != lastPercent) {
-                                    lastPercent = percent
-                                    onProgress(percent / 100f)
-                                }
+            var written = 0L
+            part.outputStream().use { out ->
+                connection.inputStream.use { input ->
+                    val buffer = ByteArray(64 * 1024)
+                    var lastPercent = -1
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        out.write(buffer, 0, read)
+                        written += read
+                        if (total > 0) {
+                            val percent = (written * 100 / total).toInt()
+                            if (percent != lastPercent) {
+                                lastPercent = percent
+                                onProgress(percent / 100f)
                             }
                         }
                     }
-                    session.fsync(out)
                 }
-                val callback = PendingIntent.getBroadcast(
-                    context, sessionId,
-                    Intent(context, InstallResultReceiver::class.java).setPackage(context.packageName),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
-                )
-                session.commit(callback.intentSender)
             }
+            if (total > 0 && written != total) error("download cut short ($written of $total bytes)")
+            apk.delete()
+            if (!part.renameTo(apk)) error("couldn't store the download")
+            return apk
         } finally {
             connection.disconnect()
+        }
+    }
+
+    /** Hands the APK to Android's package installer; the result arrives at [InstallResultReceiver]. */
+    private fun commit(context: Context, apk: File) {
+        val installer = context.packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL).apply {
+            setAppPackageName(context.packageName)
+            setSize(apk.length())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_NOT_REQUIRED)
+            }
+        }
+        val sessionId = installer.createSession(params)
+        installer.openSession(sessionId).use { session ->
+            session.openWrite("grippy.apk", 0, apk.length()).use { out ->
+                apk.inputStream().use { it.copyTo(out, 64 * 1024) }
+                session.fsync(out)
+            }
+            val callback = PendingIntent.getBroadcast(
+                context, sessionId,
+                Intent(context, InstallResultReceiver::class.java).setPackage(context.packageName),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+            )
+            session.commit(callback.intentSender)
         }
     }
 }
@@ -194,10 +248,11 @@ class InstallResultReceiver : BroadcastReceiver() {
                 val confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT, Intent::class.java) ?: return
                 confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 runCatching { context.startActivity(confirm) }
-                    .onFailure { UpdateManager.installFailed("Open Grippy and tap Update again to finish installing.") }
+                    .onFailure { UpdateManager.installFailed(context, "Open Grippy and tap Update again to finish installing.") }
             }
             PackageInstaller.STATUS_SUCCESS -> Unit // The app restarts into the new version.
             else -> UpdateManager.installFailed(
+                context,
                 "Update failed: " + (intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE) ?: "install failed"),
             )
         }
