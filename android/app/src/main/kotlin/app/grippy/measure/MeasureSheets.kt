@@ -130,6 +130,19 @@ fun StartSheet(nav: MeasureNavigator, context: StartContext, onLiveData: () -> U
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = c.link, modifier = Modifier.size(24.dp))
                     }
                 }
+                Spacer(Modifier.height(10.dp))
+                OutlinedCard(radius = 22.dp, onClick = { nav.startSheet = null; nav.push(MeasureRoute.Plans) }) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        ExerciseArt("Wrist extension", 42.dp)
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Camera session", style = textStyle(17.sp, FontWeight.Bold, c.text))
+                            Spacer(Modifier.height(2.dp))
+                            Text("Your planned exercises and weights, set by set.", style = textStyle(14.sp, FontWeight.Normal, c.text2))
+                        }
+                        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = c.link, modifier = Modifier.size(24.dp))
+                    }
+                }
                 Spacer(Modifier.height(22.dp))
                 SectionLabel("Measurement type")
                 Spacer(Modifier.height(10.dp))

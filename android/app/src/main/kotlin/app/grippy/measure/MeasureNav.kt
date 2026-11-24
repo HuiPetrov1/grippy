@@ -44,7 +44,13 @@ sealed interface MeasureRoute {
     /** Counting reps with the camera phone, and then looking at what it counted. */
     class Reps(val run: RepRun) : MeasureRoute
     class RepsReview(val run: RepRun) : MeasureRoute
+    /** Camera session plans, and one plan's editor. */
+    data object Plans : MeasureRoute
+    data class PlanEdit(val id: Long) : MeasureRoute
 }
+
+/** Seconds from tapping Start to counting in a planned session: enough to get the hand in place. */
+const val PLAN_START_AFTER = 3
 
 /** The Measure section's back stack and its two sheets. Outlives a rotation. */
 class MeasureNavigator : ViewModel() {
@@ -71,7 +77,24 @@ class MeasureNavigator : ViewModel() {
     fun begin(request: MeasureRequest) {
         handSheet = null
         startSheet = null
-        push(if (request.type.usesCamera) MeasureRoute.Reps(RepRun(request)) else MeasureRoute.Run(MeasureRun(request)))
+        push(
+            if (request.type.usesCamera) {
+                val sets = request.hands.map { RepSet(request.exerciseId, "", null, it) }
+                MeasureRoute.Reps(RepRun(sets, request.startAfter, request.folderId))
+            } else MeasureRoute.Run(MeasureRun(request)),
+        )
+    }
+
+    /** A planned camera session: its sets in order, each started by the person. */
+    fun beginPlan(plan: SessionPlan, sets: List<RepSet>) {
+        handSheet = null
+        startSheet = null
+        if (sets.isNotEmpty()) push(MeasureRoute.Reps(RepRun(sets, PLAN_START_AFTER, planName = plan.name)))
+    }
+
+    /** Off the counting screens, back to where the session was started from. */
+    fun closeRun() {
+        while (stack.isNotEmpty() && (top is MeasureRoute.Reps || top is MeasureRoute.RepsReview)) pop()
     }
 
     /** After Save: the exercise's Measure tab, with the list underneath. */

@@ -64,6 +64,13 @@ Two phones, both with Grippy. One stands still and watches; the other is the one
   of it); the hand visible, not hidden behind the weight; background and the other hand still. The
   count appears after the 3rd rep (quick small reps on a sway: about the 8th); sets of 1–2 reps are not
   counted. The main phone shows the camera's frame rate; below 20 a second, give it more light.
+- **Camera sessions:** Measure → "Camera session" keeps plans: exercises in order, each with a weight and
+  the arm order (drag to reorder). A session goes set by set: you tap **Start** when ready, tap the card
+  to finish the set, and the rest screen shows the rest time (counting up; nothing starts by itself), the
+  next set and **Resume** for a set finished by accident. Each set is saved with its weight. The
+  exercise drawings (`res/drawable-nodpi/exercise_*.webp`) were made for Grippy with an image model.
+- **Camera phone screen:** the back camera by default; with "Screen off after a set" allowed (device
+  admin, lock only) the camera phone switches its screen off when the session ends.
 - **Tuning data:** with "Keep each set's measurements" on, the camera phone writes each set to
   `Android/data/app.grippy/files/traces/` as numbers only (format in `SetTrace.kt`).
   `adb pull` them and replay one with `tools/repcount/eval.py --bin3` (exactly as the phone counted).

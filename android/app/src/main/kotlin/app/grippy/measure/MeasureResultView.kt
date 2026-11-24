@@ -241,6 +241,7 @@ private fun statTiles(m: MeasurementEntity, points: List<ForcePoint>): List<Tile
     if (m.measureType.usesCamera) {
         val took = m.marks.filter { it.durationMs > 0 }.map { it.durationMs / 1000.0 }
         val tiles = mutableListOf(Tile("Time", m.durationSec.toDouble(), "s", 0))
+        m.loadKg?.let { tiles += Tile("Weight", it, "kg") }
         if (m.reps > 0) tiles += Tile("Tempo", m.tempoSec, "s/rep")
         took.minOrNull()?.let { tiles += Tile("Fastest rep", it, "s") }
         took.maxOrNull()?.let { tiles += Tile("Slowest rep", it, "s") }

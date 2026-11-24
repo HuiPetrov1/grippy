@@ -261,6 +261,14 @@ class ScreenshotTest(private val theme: String) {
         shoot("17c-reps-connecting")
     }
 
+    @Test fun cameraSessions() {
+        openStartSheet()
+        tap("Camera session")
+        shoot("18a-camera-sessions")
+        tap("Edit")
+        shoot("18b-session-plan")
+    }
+
     @Test fun cameraSetup() {
         compose.onNode(androidx.compose.ui.test.hasContentDescription("Settings")).performClick()
         settle()

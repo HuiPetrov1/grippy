@@ -28,6 +28,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -75,6 +76,8 @@ data class MeasurementEntity(
     @ColumnInfo(defaultValue = "0") val reps: Int = 0,
     /** Each rep as `finishedMs:tookMs:range%`, joined by `;` — see [RepMarks]. */
     @ColumnInfo(defaultValue = "") val repMarks: String = "",
+    /** Reps: the weight lifted, kg (from a session plan); null when not given. */
+    val loadKg: Double? = null,
 ) {
     val measureType: MeasureType get() = MeasureType.of(type)
     val marks: List<app.grippy.camera.RepMark> get() = RepMarks.decode(repMarks)
@@ -119,12 +122,13 @@ data class MeasurementEntity(
         fun fromReps(
             exerciseId: Long, sessionId: String, hand: Hand, seconds: Int, takenAt: Long,
             signal: List<ForcePoint>, reps: Int, marks: List<app.grippy.camera.RepMark>, bodyWeightKg: Double?,
+            loadKg: Double? = null,
         ): MeasurementEntity = MeasurementEntity(
             exerciseId = exerciseId, sessionId = sessionId, type = MeasureType.Reps.key, hand = hand.key,
             durationSec = seconds, takenAt = takenAt,
             samples = MeasureMath.encode(MeasureMath.thin(signal, hz = 12)),
             maxKg = 0.0, minKg = 0.0, avgKg = 0.0, impulse = 0.0, rfd = 0.0, cfKg = 0.0,
-            bodyWeightKg = bodyWeightKg, reps = reps, repMarks = RepMarks.encode(marks),
+            bodyWeightKg = bodyWeightKg, reps = reps, repMarks = RepMarks.encode(marks), loadKg = loadKg,
         )
     }
 }
@@ -174,6 +178,13 @@ val MEASURE_MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/** Version 4: the weight lifted in a camera-counted set. */
+val MEASURE_MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `measurements` ADD COLUMN `loadKg` REAL")
+    }
+}
+
 @Dao
 interface MeasureDao {
     @Query("SELECT * FROM folders ORDER BY createdAt")
@@ -206,7 +217,7 @@ interface MeasureDao {
 
 @Database(
     entities = [FolderEntity::class, ExerciseEntity::class, MeasurementEntity::class, PlanEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class MeasureDatabase : RoomDatabase() {
@@ -238,6 +249,9 @@ class MeasureStore(private val db: MeasureDatabase) {
     /** The exercises inside go back to My Measures; nothing measured is lost. */
     fun deleteFolder(id: Long) = scope.launch { dao.releaseFolder(id); dao.deleteFolder(id) }
 
+    /** The exercises as stored right now (not the screen's copy, which starts empty). */
+    suspend fun currentExercises(): List<ExerciseEntity> = dao.exercises().first()
+
     suspend fun addExercise(name: String, folderId: Long?): Long =
         dao.insert(ExerciseEntity(name = name.trim(), folderId = folderId))
 
@@ -266,7 +280,7 @@ object MeasureStores {
         val builder = if (Build.FINGERPRINT == "robolectric") {
             Room.inMemoryDatabaseBuilder(app, MeasureDatabase::class.java).allowMainThreadQueries()
         } else {
-            Room.databaseBuilder(app, MeasureDatabase::class.java, "grippy-measure.db").addMigrations(MEASURE_MIGRATION_1_2, MEASURE_MIGRATION_2_3)
+            Room.databaseBuilder(app, MeasureDatabase::class.java, "grippy-measure.db").addMigrations(MEASURE_MIGRATION_1_2, MEASURE_MIGRATION_2_3, MEASURE_MIGRATION_3_4)
         }
         return MeasureStore(builder.build()).also { store = it; owner = app }
     }

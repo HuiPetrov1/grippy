@@ -17,6 +17,16 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import kotlinx.coroutines.delay
+import android.os.SystemClock
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -72,6 +82,14 @@ import kotlin.math.ceil
 private val RepGreen = Color(0xFF30D158)
 private val RepAmber = Color(0xFFFFB340)
 
+/** The name a set is shown under: its exercise's, once known. */
+internal fun RepSet.title(data: MeasureSnapshot): String =
+    exerciseId?.let { data.exercise(it)?.name } ?: exercise.ifBlank { "Reps" }
+
+/** "Pronation · 2 kg" — what the camera phone shows. */
+private fun RepSet.cameraTitle(data: MeasureSnapshot): String =
+    listOfNotNull(title(data), weightKg?.let { kgText(it) }).joinToString(" · ")
+
 @Composable
 fun RepRunScreen(nav: MeasureNavigator, run: RepRun) {
     val c = measureColors()
@@ -106,8 +124,8 @@ fun RepRunScreen(nav: MeasureNavigator, run: RepRun) {
         run.started = true
         run.drive(
             client = client,
-            exercise = run.request.exerciseId?.let { data.exercise(it)?.name } ?: "",
             frontCamera = CameraRole.frontCamera(context),
+            title = { it.cameraTitle(data) },
             cue = { cue ->
                 when (cue) {
                     RepRun.Cue.Tick -> tones?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
@@ -124,13 +142,14 @@ fun RepRunScreen(nav: MeasureNavigator, run: RepRun) {
     }
 
     Column(Modifier.fillMaxSize().background(c.bg)) {
-        TopBar(title = "Reps · camera", onBack = { confirmQuit = true })
+        TopBar(title = run.planName ?: "Reps · camera", onBack = { confirmQuit = true })
         Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             when (run.stage) {
                 RepRun.Stage.Connecting -> Finding(client.link)
                 RepRun.Stage.Waking -> WakingUp(run.wakingFor)
-                RepRun.Stage.Countdown -> RepCountdown(run)
-                RepRun.Stage.Counting -> RepCounting(run)
+                RepRun.Stage.Ready -> ReadyBetweenSets(run, data)
+                RepRun.Stage.Countdown -> RepCountdown(run, data)
+                RepRun.Stage.Counting -> CardStack(run, data)
                 RepRun.Stage.Finishing -> {
                     Spacer(Modifier.height(98.dp))
                     CircularProgressIndicator(color = c.blue, strokeWidth = 4.dp, modifier = Modifier.size(46.dp))
@@ -140,13 +159,21 @@ fun RepRunScreen(nav: MeasureNavigator, run: RepRun) {
                 RepRun.Stage.Done -> Unit
             }
         }
-        Column(Modifier.navigationBarsPadding().padding(16.dp)) {
+        Column(Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
             when (run.stage) {
-                RepRun.Stage.Counting -> PrimaryButton(
-                    if (run.isLastHand) "Stop" else "Stop · next: ${run.request.hands[run.handIndex + 1].label.lowercase()} hand",
-                    onClick = { run.finishHand() },
-                )
-                RepRun.Stage.Finishing, RepRun.Stage.Done -> Unit
+                RepRun.Stage.Ready -> {
+                    if (run.allDone) PrimaryButton("Finish & review", onClick = { run.finishSession() })
+                    else PrimaryButton("Start", onClick = { run.start() })
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        if (!run.allDone) {
+                            TextButton(onClick = { run.skip() }) { Text("Skip this set", style = textStyle(14.sp, FontWeight.Medium, c.text2)) }
+                        } else Spacer(Modifier.width(1.dp))
+                        if (!run.allDone && run.results.isNotEmpty()) {
+                            TextButton(onClick = { run.finishSession() }) { Text("End session", style = textStyle(14.sp, FontWeight.Medium, c.text2)) }
+                        }
+                    }
+                }
+                RepRun.Stage.Counting, RepRun.Stage.Finishing, RepRun.Stage.Done -> Unit
                 else -> SecondaryButton("Cancel", onClick = { nav.pop() })
             }
         }
@@ -155,11 +182,240 @@ fun RepRunScreen(nav: MeasureNavigator, run: RepRun) {
     if (confirmQuit) {
         AlertDialog(
             onDismissRequest = { confirmQuit = false },
-            title = { Text("Stop counting?") },
-            text = { Text("Nothing from this set will be saved.") },
+            title = { Text("Stop the session?") },
+            text = { Text(if (run.results.isEmpty()) "Nothing has been counted yet." else "The sets counted so far are not saved.") },
             confirmButton = { TextButton(onClick = { confirmQuit = false; nav.pop() }) { Text("Stop") } },
             dismissButton = { TextButton(onClick = { confirmQuit = false }) { Text("Keep going") } },
         )
+    }
+}
+
+/** Screenshots only: the session screen's middle part for [run] as it stands, without a camera phone. */
+@Composable
+internal fun RepSessionPreview(run: RepRun, data: MeasureSnapshot) {
+    val c = measureColors()
+    Column(Modifier.fillMaxSize().background(c.bg)) {
+        TopBar(title = run.planName ?: "Reps · camera", onBack = {})
+        Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            if (run.stage == RepRun.Stage.Counting) CardStack(run, data) else ReadyBetweenSets(run, data)
+        }
+        if (run.stage == RepRun.Stage.Ready) {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                PrimaryButton("Start", onClick = {})
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton(onClick = {}) { Text("Skip this set", style = textStyle(14.sp, FontWeight.Medium, c.text2)) }
+                    TextButton(onClick = {}) { Text("End session", style = textStyle(14.sp, FontWeight.Medium, c.text2)) }
+                }
+            }
+        }
+    }
+}
+
+/** The exercise's drawing on its dark tile (the art is drawn on that colour). */
+@Composable
+internal fun ExerciseArt(name: String, size: Dp, modifier: Modifier = Modifier) {
+    val art = exerciseArt(name)
+    Box(modifier.size(size).clip(RoundedCornerShape(size / 5)).background(ArtTile), contentAlignment = Alignment.Center) {
+        if (art != null) {
+            Image(painterResource(art), contentDescription = name, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+        } else {
+            Text(name.take(1).uppercase(), style = textStyle((size.value * 0.4f).sp, FontWeight.Bold, Color(0xFF8E8E93)))
+        }
+    }
+}
+
+private val ArtTile = Color(0xFF1B1B20)
+
+private fun armLabel(hand: Hand) = "${hand.label} arm"
+
+/** Between sets: what was just done (can be resumed), how long the rest has been, and what is next. Nothing starts by itself. */
+@Composable
+private fun ReadyBetweenSets(run: RepRun, data: MeasureSnapshot) {
+    val c = measureColors()
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        Spacer(Modifier.height(6.dp))
+        val last = run.lastDone?.let { i -> run.results[i]?.let { i to it } }
+        if (last != null) {
+            val (i, result) = last
+            OutlinedCard {
+                Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(30.dp).clip(CircleShape).background(RepGreen), contentAlignment = Alignment.Center) {
+                        Text("✓", style = textStyle(17.sp, FontWeight.Bold, Color.Black))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("${armLabel(result.set.hand)} done · ${result.reps} reps", style = textStyle(17.sp, FontWeight.SemiBold, c.text))
+                        Text(run.sets[i].title(data), style = textStyle(13.sp, FontWeight.Normal, c.text2), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    TextButton(onClick = { run.resume() }) {
+                        Text("↺ Resume", style = textStyle(14.sp, FontWeight.SemiBold, c.link))
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+        OutlinedCard {
+            Column(Modifier.fillMaxWidth().padding(vertical = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                if (run.restFrom == 0L) {
+                    Text("Ready when you are", style = textStyle(22.sp, FontWeight.Bold, c.text))
+                    Spacer(Modifier.height(4.dp))
+                    Text("Tap Start when you're in position.", style = textStyle(14.sp, FontWeight.Normal, c.text2))
+                } else {
+                    var now by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+                    LaunchedEffect(run.restFrom) { while (true) { now = SystemClock.elapsedRealtime(); delay(250) } }
+                    val rest = ((now - run.restFrom) / 1000).coerceAtLeast(0)
+                    Text("Rest", style = textStyle(17.sp, FontWeight.SemiBold, c.text2))
+                    Text("${rest / 60}:${"%02d".format(rest % 60)}", style = textStyle(76.sp, FontWeight.Bold, c.blue, (-2).sp))
+                    Text("Your pace: start whenever you're ready.", style = textStyle(13.sp, FontWeight.Normal, c.text3))
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        val next = run.set
+        if (next == null) {
+            OutlinedCard {
+                Column(Modifier.fillMaxWidth().padding(18.dp)) {
+                    Text("All sets done", style = textStyle(24.sp, FontWeight.Bold, c.text))
+                    Spacer(Modifier.height(4.dp))
+                    val total = run.results.values.sumOf { it.reps }
+                    Text("${run.results.size} sets · $total reps. Resume the last one, or finish and check the counts.",
+                        style = textStyle(14.sp, FontWeight.Normal, c.text2))
+                }
+            }
+        } else {
+            OutlinedCard(onClick = { run.start() }, borderColor = c.blue.copy(alpha = .55f)) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Up next · Set ${run.index + 1} of ${run.sets.size}", style = textStyle(14.sp, FontWeight.SemiBold, c.link))
+                        Spacer(Modifier.height(4.dp))
+                        Text(armLabel(next.hand), style = textStyle(30.sp, FontWeight.Bold, c.text, (-0.5).sp))
+                        Text(listOfNotNull(next.title(data), next.weightKg?.let { kgText(it) }).joinToString(" · "),
+                            style = textStyle(16.sp, FontWeight.Medium, c.text2))
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    ExerciseArt(next.title(data), 104.dp)
+                }
+            }
+            val later = run.sets.drop(run.index + 1).take(3)
+            if (later.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Text("Then", style = textStyle(13.sp, FontWeight.SemiBold, c.text3))
+                later.forEach { s ->
+                    Spacer(Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Dot(if (s.hand == Hand.Left) c.left else c.right, 7.dp)
+                        Spacer(Modifier.width(8.dp))
+                        Text("${s.title(data)} · ${s.weightKg?.let { kgText(it) + " · " } ?: ""}${s.hand.label}",
+                            style = textStyle(14.sp, FontWeight.Normal, c.text2), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
+    }
+}
+
+@Composable
+private fun RepCountdown(run: RepRun, data: MeasureSnapshot) {
+    val c = measureColors()
+    val set = run.sets.getOrNull(run.countingIndex) ?: return
+    Spacer(Modifier.height(18.dp))
+    ExerciseArt(set.title(data), 120.dp)
+    Spacer(Modifier.height(12.dp))
+    Text(set.title(data), style = textStyle(20.sp, FontWeight.Bold, c.text), textAlign = TextAlign.Center)
+    Text(listOfNotNull(set.weightKg?.let { kgText(it) }, armLabel(set.hand)).joinToString(" · "), style = textStyle(16.sp, FontWeight.Medium, c.text2))
+    Text(if (run.countdown > 0) "${run.countdown}" else "…", style = textStyle(110.sp, FontWeight.Bold, c.text, (-4).sp))
+    Text("Counting starts in", style = textStyle(14.sp, FontWeight.Normal, c.text2))
+    Spacer(Modifier.height(14.dp))
+    SeenCard(run, Modifier.size(width = 96.dp, height = 128.dp))
+    Spacer(Modifier.height(8.dp))
+    TrackingPill(run.tracking, counting = false)
+}
+
+/** Counting: the set as a big card (tap it to finish the set), the next sets peeking out above it. */
+@Composable
+private fun CardStack(run: RepRun, data: MeasureSnapshot) {
+    val c = measureColors()
+    val position = run.countingIndex
+    val counting = run.sets.getOrNull(position) ?: return
+    val next = run.sets.drop(position + 1).take(2)
+    Box(Modifier.fillMaxSize().padding(top = 4.dp, bottom = 8.dp)) {
+        next.getOrNull(1)?.let { PeekCard(it, data, Modifier.padding(horizontal = 30.dp)) }
+        next.getOrNull(0)?.let { PeekCard(it, data, Modifier.padding(horizontal = 15.dp, vertical = 0.dp).padding(top = 20.dp)) }
+        val top = when (next.size) { 0 -> 0.dp; 1 -> 22.dp; else -> 42.dp }
+        OutlinedCard(Modifier.padding(top = top).fillMaxSize(), onClick = { run.finishSet() }, radius = 26.dp, color = c.card) {
+            CountingCard(run, counting, position, next.firstOrNull(), data)
+        }
+    }
+}
+
+@Composable
+private fun PeekCard(set: RepSet, data: MeasureSnapshot, modifier: Modifier) {
+    val c = measureColors()
+    Box(modifier.fillMaxWidth().height(44.dp).clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp)).background(c.raised)
+        .border(BorderStroke(1.dp, c.border), RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp))) {
+        Text(listOfNotNull(set.title(data), set.weightKg?.let { kgText(it) }, armLabel(set.hand)).joinToString(" · "),
+            style = textStyle(13.sp, FontWeight.SemiBold, c.text2), maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+    }
+}
+
+@Composable
+private fun CountingCard(run: RepRun, set: RepSet, position: Int, next: RepSet?, data: MeasureSnapshot) {
+    val c = measureColors()
+    val handColor = if (set.hand == Hand.Left) c.left else c.right
+    Column(Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            ExerciseArt(set.title(data), 76.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(set.title(data), style = textStyle(19.sp, FontWeight.Bold, c.text), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(listOfNotNull(set.weightKg?.let { kgText(it) }, armLabel(set.hand)).joinToString(" · "),
+                    style = textStyle(15.sp, FontWeight.Medium, c.text2))
+                Spacer(Modifier.height(5.dp))
+                Text("Set ${position + 1} of ${run.sets.size}", style = textStyle(12.5.sp, FontWeight.SemiBold, Color.White),
+                    modifier = Modifier.clip(CircleShape).background(c.blue).padding(horizontal = 10.dp, vertical = 3.dp))
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        val shown = run.resumedFrom + run.count
+        AnimatedContent(
+            targetState = shown,
+            transitionSpec = { (scaleIn(spring(dampingRatio = 0.55f), initialScale = 0.8f) + fadeIn()) togetherWith fadeOut() },
+            label = "reps",
+        ) { n ->
+            Text("$n", style = textStyle(124.sp, FontWeight.Bold, c.blue, (-4).sp),
+                modifier = Modifier.semantics { contentDescription = "$n reps" })
+        }
+        Text(if (run.resumedFrom > 0) "reps · ${run.resumedFrom} before the break" else "reps", style = textStyle(17.sp, FontWeight.SemiBold, c.text2))
+        Spacer(Modifier.height(6.dp))
+        Text(
+            next?.let { "Next: " + if (it.exerciseId == set.exerciseId && it.weightKg == set.weightKg) armLabel(it.hand) else "${it.title(data)} · ${armLabel(it.hand)}" }
+                ?: "Last set",
+            style = textStyle(16.sp, FontWeight.Medium, c.text2),
+        )
+        Spacer(Modifier.weight(1f))
+        val tempo = run.marks.filter { it.durationMs > 0 }.takeLast(5).map { it.durationMs }.average().takeIf { !it.isNaN() }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+            Text("${run.elapsed.toInt() / 60}:${"%02d".format(run.elapsed.toInt() % 60)}", style = textStyle(15.sp, FontWeight.SemiBold, c.text))
+            Text(tempo?.let { "${"%.1f".format(Locale.US, it / 1000)} s/rep" } ?: "– s/rep", style = textStyle(15.sp, FontWeight.SemiBold, c.text))
+            TrackingPill(run.tracking, counting = true)
+        }
+        Spacer(Modifier.height(10.dp))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            SeenCard(run, Modifier.size(width = 66.dp, height = 88.dp))
+            Spacer(Modifier.width(10.dp))
+            val window = maxOf(12, ceil(run.elapsed + 1).toInt())
+            LiveCurve(run.signal.toList(), window, handColor, c.divider, Modifier.weight(1f).height(88.dp))
+        }
+        Spacer(Modifier.height(10.dp))
+        val hint = if (run.count == 0) "Counting shows after your 3rd rep (quick small reps: about the 8th)." else null
+        Text(listOfNotNull("Tap the card to finish this set", hint).joinToString("\n"),
+            style = textStyle(13.5.sp, FontWeight.Medium, c.text3), textAlign = TextAlign.Center)
+        if (run.cameraFps in 1 until SLOW_CAMERA_FPS) {
+            Text("Camera at ${run.cameraFps} frames/s. More light lets it see quick reps.",
+                style = textStyle(12.5.sp, FontWeight.Normal, RepAmber), textAlign = TextAlign.Center)
+        }
     }
 }
 
@@ -222,69 +478,10 @@ private fun SeenCard(run: RepRun, modifier: Modifier = Modifier) {
     }
 }
 
-@Composable
-private fun RepCountdown(run: RepRun) {
-    val c = measureColors()
-    Spacer(Modifier.height(24.dp))
-    HandBadge(run.hand)
-    Spacer(Modifier.height(14.dp))
-    Text(if (run.handIndex > 0) "Switch hands" else "Get in position", style = textStyle(19.5.sp, FontWeight.SemiBold, c.text2))
-    Text(if (run.countdown > 0) "${run.countdown}" else "…", style = textStyle(110.sp, FontWeight.Bold, c.text, (-4).sp))
-    Text("Counting starts in", style = textStyle(14.sp, FontWeight.Normal, c.text2))
-    Spacer(Modifier.height(18.dp))
-    SeenCard(run, Modifier.size(width = 120.dp, height = 160.dp))
-    Spacer(Modifier.height(10.dp))
-    TrackingPill(run.tracking, counting = false)
-}
-
-@Composable
-private fun RepCounting(run: RepRun) {
-    val c = measureColors()
-    val handColor = if (run.hand == Hand.Left) c.left else c.right
-    Spacer(Modifier.height(10.dp))
-    HandBadge(run.hand)
-    Spacer(Modifier.height(4.dp))
-    AnimatedContent(
-        targetState = run.count,
-        transitionSpec = { (scaleIn(spring(dampingRatio = 0.55f), initialScale = 0.8f) + fadeIn()) togetherWith fadeOut() },
-        label = "reps",
-    ) { n ->
-        Text("$n", style = textStyle(120.sp, FontWeight.Bold, c.text, (-4).sp),
-            modifier = Modifier.semantics { contentDescription = "$n reps" })
-    }
-    Text("reps", style = textStyle(17.sp, FontWeight.SemiBold, c.text2))
-    Spacer(Modifier.height(8.dp))
-    val tempo = run.marks.filter { it.durationMs > 0 }.takeLast(5).map { it.durationMs }.average().takeIf { !it.isNaN() }
-    Text(
-        "${run.elapsed.toInt()} s" + (tempo?.let { " · ${"%.1f".format(Locale.US, it / 1000)} s per rep" } ?: ""),
-        style = textStyle(15.sp, FontWeight.Medium, c.text2),
-    )
-    Spacer(Modifier.height(14.dp))
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        SeenCard(run, Modifier.size(width = 84.dp, height = 112.dp))
-        Spacer(Modifier.width(12.dp))
-        val window = maxOf(12, ceil(run.elapsed + 1).toInt())
-        LiveCurve(run.signal.toList(), window, handColor, c.divider, Modifier.weight(1f).height(112.dp))
-    }
-    Spacer(Modifier.height(10.dp))
-    TrackingPill(run.tracking, counting = true)
-    Spacer(Modifier.height(8.dp))
-    Text(if (run.count == 0) "The count shows after your 3rd rep (quick small reps: about the 8th). Press Stop when the set is done." else "Press Stop when the set is done.",
-        style = textStyle(13.5.sp, FontWeight.Normal, c.text3), textAlign = TextAlign.Center)
-    if (run.cameraFps > 0) {
-        Spacer(Modifier.height(4.dp))
-        val slow = run.cameraFps < SLOW_CAMERA_FPS
-        Text(
-            if (slow) "Camera at ${run.cameraFps} frames/s. More light lets it see quick reps." else "Camera at ${run.cameraFps} frames/s",
-            style = textStyle(12.5.sp, FontWeight.Normal, if (slow) RepAmber else c.text3), textAlign = TextAlign.Center,
-        )
-    }
-}
-
 /** Below this the camera phone misses the turn of a rep that takes under a second. */
 private const val SLOW_CAMERA_FPS = 20
 
-/** After counting: the numbers (the count can be corrected), and which exercise they belong to. */
+/** After the session: every set's count (it can be corrected), and — when not known yet — the exercise. */
 @Composable
 fun RepReviewScreen(nav: MeasureNavigator, run: RepRun) {
     val c = measureColors()
@@ -292,74 +489,81 @@ fun RepReviewScreen(nav: MeasureNavigator, run: RepRun) {
     val data = store.collect()
     val settings = LocalSettingsStore.current
     val scope = rememberCoroutineScope()
-    val preset = run.request.exerciseId?.let { data.exercise(it) }
-    var picked by remember { mutableStateOf<Long?>(run.request.exerciseId) }
+    val needsExercise = run.results.values.any { it.set.exerciseId == null }
+    var picked by remember { mutableStateOf<Long?>(null) }
     var newName by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
     BackHandler { confirmDiscard = true }
 
-    val canSave = !saving && run.results.isNotEmpty() && (picked != null || newName.isNotBlank())
+    val done = run.results.keys.sorted().mapNotNull { i -> run.results[i] }
+    val canSave = !saving && done.isNotEmpty() && (!needsExercise || picked != null || newName.isNotBlank())
 
     Column(Modifier.fillMaxSize().background(c.bg).imePadding()) {
         TopBar("Result", onBack = { confirmDiscard = true })
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-            Text("Reps", style = textStyle(23.sp, FontWeight.Bold, c.text))
-            Text(longDate(run.startedAt), style = textStyle(13.sp, FontWeight.Normal, c.text2))
+            Text(run.planName ?: "Reps", style = textStyle(23.sp, FontWeight.Bold, c.text))
+            Text("${longDate(run.startedAt)} · ${done.size} sets · ${done.sumOf { it.reps }} reps", style = textStyle(13.sp, FontWeight.Normal, c.text2))
             Spacer(Modifier.height(15.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                run.request.hands.forEach { hand ->
-                    val result = run.results[hand] ?: return@forEach
-                    val color = if (hand == Hand.Left) c.left else c.right
-                    OutlinedCard(Modifier.weight(1f)) {
-                        Column(Modifier.padding(13.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Dot(color, 8.dp)
-                                Spacer(Modifier.width(7.dp))
-                                Text(hand.label, style = textStyle(14.sp, FontWeight.Medium, c.text2))
-                            }
-                            Spacer(Modifier.height(6.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Stepper("−", "One rep fewer, ${hand.label}", enabled = result.reps > 0) { result.reps-- }
-                                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                                    ValueWithUnit("${result.reps}", "reps", 36.sp, c.text, c.text2)
+            done.forEach { result ->
+                val set = result.set
+                val color = if (set.hand == Hand.Left) c.left else c.right
+                OutlinedCard {
+                    Column(Modifier.padding(13.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            ExerciseArt(set.title(data), 48.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(set.title(data), style = textStyle(15.sp, FontWeight.SemiBold, c.text), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Dot(color, 7.dp)
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(listOfNotNull("${set.hand.label} arm", set.weightKg?.let { kgText(it) }).joinToString(" · "),
+                                        style = textStyle(13.sp, FontWeight.Medium, c.text2))
                                 }
-                                Stepper("+", "One rep more, ${hand.label}", enabled = true) { result.reps++ }
                             }
-                            if (result.reps != result.marks.size) {
-                                Text("Camera counted ${result.marks.size}", style = textStyle(12.sp, FontWeight.Normal, c.text3),
-                                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                            Stepper("−", "One rep fewer", enabled = result.reps > 0) { result.reps-- }
+                            Box(Modifier.width(64.dp), contentAlignment = Alignment.Center) {
+                                ValueWithUnit("${result.reps}", "reps", 26.sp, c.text, c.text2)
                             }
-                            Spacer(Modifier.height(8.dp))
-                            LiveCurve(result.signal, maxOf(1, ceil(result.signal.lastOrNull()?.t ?: 1.0).toInt()), color, c.divider,
-                                Modifier.fillMaxWidth().height(57.dp))
-                            Spacer(Modifier.height(8.dp))
-                            val seconds = RepRun.secondsToSave(result)
-                            StatLine("Time", "$seconds s")
-                            StatLine("Tempo", if (result.reps > 0) "${"%.1f".format(Locale.US, result.seconds / result.reps)} s/rep" else "–")
-                            StatLine("Counted from", if (result.tracking == Tracking.Hand) "your hand" else "movement")
+                            Stepper("+", "One rep more", enabled = true) { result.reps++ }
                         }
+                        Spacer(Modifier.height(8.dp))
+                        LiveCurve(result.signal, maxOf(1, ceil(result.signal.lastOrNull()?.t ?: 1.0).toInt()), color, c.divider,
+                            Modifier.fillMaxWidth().height(44.dp))
+                        Spacer(Modifier.height(6.dp))
+                        val seconds = RepRun.secondsToSave(result)
+                        val tempo = if (result.reps > 0) "${"%.1f".format(Locale.US, result.seconds / result.reps)} s/rep" else "–"
+                        val camera = if (result.reps != result.marks.size) " · camera counted ${result.marks.size}" else ""
+                        Text("$seconds s · $tempo · from ${if (result.tracking == Tracking.Hand) "your hand" else "movement"}$camera",
+                            style = textStyle(12.5.sp, FontWeight.Normal, c.text3))
                     }
                 }
+                Spacer(Modifier.height(10.dp))
             }
-            Spacer(Modifier.height(8.dp))
             Text("Wrong count? Fix it with − and + before saving.", style = textStyle(12.5.sp, FontWeight.Normal, c.text3))
-            Spacer(Modifier.height(18.dp))
-            ExerciseChooser(data, preset, picked, newName, onPick = { picked = it; newName = "" }, onName = { newName = it; if (it.isNotBlank()) picked = null })
+            if (needsExercise) {
+                Spacer(Modifier.height(18.dp))
+                ExerciseChooser(data, null, picked, newName, onPick = { picked = it; newName = "" }, onName = { newName = it; if (it.isNotBlank()) picked = null })
+            }
             Spacer(Modifier.height(20.dp))
         }
         Column(Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp)) {
             PrimaryButton(if (saving) "Saving…" else "Save", enabled = canSave, onClick = {
                 saving = true
                 scope.launch {
-                    val exerciseId = picked ?: store.addExercise(newName, run.request.folderId)
-                    store.save(run.request.hands.mapNotNull { hand ->
-                        run.results[hand]?.let { r ->
-                            MeasurementEntity.fromReps(exerciseId, run.sessionId, hand, RepRun.secondsToSave(r), run.startedAt,
-                                r.signal, r.reps, r.marks, settings.bodyWeightKg)
-                        }
-                    })
-                    nav.showExercise(exerciseId)
+                    val chosen = if (needsExercise) picked ?: store.addExercise(newName, run.folderId) else null
+                    // Both arms of one exercise share a session, as with the scale.
+                    val sessions = HashMap<Long, String>()
+                    val rows = done.map { r ->
+                        val exerciseId = r.set.exerciseId ?: chosen!!
+                        val session = sessions.getOrPut(exerciseId) { java.util.UUID.randomUUID().toString() }
+                        MeasurementEntity.fromReps(exerciseId, session, r.set.hand, RepRun.secondsToSave(r), r.takenAt,
+                            r.signal, r.reps, r.marks, settings.bodyWeightKg, r.set.weightKg)
+                    }
+                    store.save(rows)
+                    val exercises = rows.map { it.exerciseId }.distinct()
+                    if (exercises.size == 1) nav.showExercise(exercises.single()) else nav.closeRun()
                 }
             })
             TextButton(onClick = { confirmDiscard = true }, modifier = Modifier.fillMaxWidth()) {
@@ -371,7 +575,7 @@ fun RepReviewScreen(nav: MeasureNavigator, run: RepRun) {
     if (confirmDiscard) {
         AlertDialog(
             onDismissRequest = { confirmDiscard = false },
-            title = { Text("Discard this result?") },
+            title = { Text("Discard this session?") },
             confirmButton = { TextButton(onClick = { confirmDiscard = false; nav.pop() }) { Text("Discard") } },
             dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep") } },
         )

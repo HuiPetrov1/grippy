@@ -130,6 +130,8 @@ fun MeasureRouteHost(nav: MeasureNavigator) {
         is MeasureRoute.Review -> MeasureReviewScreen(nav, route.run)
         is MeasureRoute.Reps -> RepRunScreen(nav, route.run)
         is MeasureRoute.RepsReview -> RepReviewScreen(nav, route.run)
+        is MeasureRoute.Plans -> PlansScreen(nav)
+        is MeasureRoute.PlanEdit -> PlanEditScreen(nav, route.id)
         null -> Unit
     }
 }
