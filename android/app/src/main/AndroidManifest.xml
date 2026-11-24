@@ -176,6 +176,18 @@
             android:name="app.grippy.camera.CameraLinkService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+        <!-- Camera phone: switching the screen off after a set (device admin, "lock now" only). -->
+        <receiver
+            android:name="app.grippy.camera.ScreenOffAdmin"
+            android:exported="true"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/screen_off_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
         <receiver
             android:name="app.grippy.camera.CameraBootReceiver"
             android:exported="true">

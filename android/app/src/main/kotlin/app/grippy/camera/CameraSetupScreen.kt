@@ -173,7 +173,7 @@ fun CameraSetupScreen(modifier: Modifier = Modifier) {
             Column(Modifier.padding(14.dp)) {
                 Text("Camera", style = textStyle(15.5.sp, FontWeight.SemiBold, c.text))
                 Spacer(Modifier.height(8.dp))
-                Segmented(listOf(true, false), front, { if (it) "Front" else "Back" }, { front = it; CameraRole.setFrontCamera(context, it) }, Modifier.fillMaxWidth())
+                Segmented(listOf(false, true), front, { if (it) "Front" else "Back" }, { front = it; CameraRole.setFrontCamera(context, it) }, Modifier.fillMaxWidth())
                 Spacer(Modifier.height(8.dp))
                 Text(
                     if (front) "Front: the screen faces you, so you can read the count while you train."
@@ -243,6 +243,13 @@ private fun needs(context: Context, ask: (Array<String>) -> Unit): List<Need> {
     list += Need("No battery restrictions", "So Android does not put the link to sleep.", unrestricted) {
         @Suppress("BatteryLife")
         go(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, pkg), Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS), details)
+    }
+    list += Need(
+        "Screen off after a set",
+        "Optional. Lets Grippy switch this screen off when your main phone stops; otherwise it dims on its own timer.",
+        ScreenOff.allowed(context),
+    ) {
+        go(ScreenOff.askIntent(context))
     }
     if (isXiaomi()) {
         // Xiaomi keeps these in its own settings, and gives apps no way to read them.

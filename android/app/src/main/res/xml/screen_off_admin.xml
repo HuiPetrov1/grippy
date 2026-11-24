@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Grippy camera phone: the only device-admin power it asks for is switching the screen off
+     ("lock now") after a set. Nothing else: no wiping, no password rules. -->
+<device-admin>
+    <uses-policies>
+        <force-lock />
+    </uses-policies>
+</device-admin>

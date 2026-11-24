@@ -249,12 +249,17 @@ class CameraActivity : ComponentActivity() {
                 ui.byLink = true
                 ui.exercise = command.exercise
                 ui.last = null
-                if (command.frontCamera != ui.front) { ui.front = command.frontCamera; if (provider != null) bind() }
+                // Which camera is this phone's own choice (Settings → Camera phone, or the switch button):
+                // the main phone's copy of that setting is ignored.
                 publish(if (ui.state == CamState.Counting) CamState.Counting else if (provider == null) CamState.Starting else CamState.Framing)
             }
             is CamCommand.Begin -> begin(command.hand)
             CamCommand.End -> end()
-            CamCommand.Sleep -> finish()
+            CamCommand.Sleep -> {
+                // The main phone is done: close the camera and switch the screen off (if allowed to).
+                finish()
+                ScreenOff.soon(this)
+            }
             CamCommand.Hello -> publish(ui.state)
         }
     }

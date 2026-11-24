@@ -51,11 +51,11 @@ object CameraRole {
 
     fun setCamera(context: Context, on: Boolean) {
         prefs(context).edit().putBoolean(IS_CAMERA, on).apply()
-        if (on) CameraLinkService.start(context) else CameraLinkService.stop(context)
+        if (on) CameraLinkService.start(context) else { CameraLinkService.stop(context); ScreenOff.release(context) }
     }
 
-    /** The front camera faces you along with the screen, so you can read the count. */
-    fun frontCamera(context: Context): Boolean = prefs(context).getBoolean(FRONT, true)
+    /** The back camera by default (the better one); the front one lets you read the camera phone's screen. */
+    fun frontCamera(context: Context): Boolean = prefs(context).getBoolean(FRONT, false)
 
     fun setFrontCamera(context: Context, on: Boolean) = prefs(context).edit().putBoolean(FRONT, on).apply()
 
