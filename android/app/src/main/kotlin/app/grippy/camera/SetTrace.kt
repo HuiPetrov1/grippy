@@ -5,7 +5,15 @@
 
 package app.grippy.camera
 
+import android.content.ClipData
 import android.content.Context
+import android.content.Intent
+import androidx.core.content.FileProvider
+import run.nuri.getagrip.ui.history.SHARE_DIR
+import run.nuri.getagrip.ui.history.ShareCache
+import java.util.UUID
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import app.grippy.measure.Hand
 import java.io.DataOutputStream
 import java.io.File
@@ -81,6 +89,43 @@ class SetTrace private constructor(private val bin: File, private val meta: File
                 "\"grid\":[${RepFeatures.GRID_W},${RepFeatures.GRID_H}]"
             SetTrace(File(dir, "$stamp.bin"), File(dir, "$stamp.json"), head)
         }.getOrNull()
+
+        /** How many sets are kept, newest first. */
+        fun count(context: Context): Int =
+            File(context.getExternalFilesDir(null) ?: context.filesDir, "traces").listFiles { f -> f.name.endsWith(".json") }?.size ?: 0
+
+        /**
+         * The newest [sets] sets in one zip, handed to the share sheet (to send them to whoever tunes the
+         * counting). Numbers only, as kept. False when there is nothing to send or it failed.
+         */
+        fun share(context: Context, sets: Int = 12): Boolean = runCatching {
+            val dir = File(context.getExternalFilesDir(null) ?: context.filesDir, "traces")
+            val metas = dir.listFiles { f -> f.name.endsWith(".json") }?.sortedByDescending { it.name }?.take(sets).orEmpty()
+            if (metas.isEmpty()) return false
+            ShareCache.purge(ShareCache.directory(context))
+            val out = File(context.cacheDir, "$SHARE_DIR/${UUID.randomUUID()}").apply { mkdirs() }
+            val zip = File(out, "grippy-camera-sets-${metas.first().name.removeSuffix(".json")}.zip")
+            ZipOutputStream(zip.outputStream().buffered()).use { z ->
+                for (meta in metas) {
+                    val bin = File(dir, meta.name.removeSuffix(".json") + ".bin")
+                    for (f in listOf(meta, bin)) if (f.exists()) {
+                        z.putNextEntry(ZipEntry(f.name))
+                        f.inputStream().use { it.copyTo(z) }
+                        z.closeEntry()
+                    }
+                }
+            }
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.files", zip)
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "application/zip"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                putExtra(Intent.EXTRA_TITLE, zip.name)
+                clipData = ClipData.newRawUri(zip.name, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            true
+        }.getOrDefault(false)
 
         private fun prune(dir: File?) {
             val sets = dir?.listFiles { f -> f.name.endsWith(".json") }?.sortedByDescending { it.name } ?: return

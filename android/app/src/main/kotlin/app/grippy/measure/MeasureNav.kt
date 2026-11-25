@@ -89,7 +89,7 @@ class MeasureNavigator : ViewModel() {
     fun beginPlan(plan: SessionPlan, sets: List<RepSet>) {
         handSheet = null
         startSheet = null
-        if (sets.isNotEmpty()) push(MeasureRoute.Reps(RepRun(sets, PLAN_START_AFTER, planName = plan.name)))
+        if (sets.isNotEmpty()) push(MeasureRoute.Reps(RepRun(sets, PLAN_START_AFTER, planName = plan.name, planId = plan.id)))
     }
 
     /** Off the counting screens, back to where the session was started from. */

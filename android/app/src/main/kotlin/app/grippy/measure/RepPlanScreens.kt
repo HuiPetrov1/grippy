@@ -47,6 +47,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -224,9 +225,13 @@ private fun ReorderableItems(
     var dragging by remember { mutableIntStateOf(-1) }
     var offset by remember { mutableFloatStateOf(0f) }
     var rowHeight by remember { mutableFloatStateOf(1f) }
+    // The drag outlives recompositions: it must move the list as it is now (a weight just changed
+    // included), not the one it started with.
+    val move by rememberUpdatedState(onMove)
+    val lastIndex by rememberUpdatedState(items.lastIndex)
     Column {
         items.forEachIndexed { i, item ->
-            val handle = Modifier.pointerInput(items.size, i) {
+            val handle = Modifier.pointerInput(i) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = { dragging = i; offset = 0f },
                     onDragEnd = { dragging = -1; offset = 0f },
@@ -236,10 +241,10 @@ private fun ReorderableItems(
                         offset += amount.y
                         val at = dragging
                         if (at < 0) return@detectDragGesturesAfterLongPress
-                        if (offset > rowHeight / 2 && at < items.lastIndex) {
-                            onMove(at, at + 1); dragging = at + 1; offset -= rowHeight
+                        if (offset > rowHeight / 2 && at < lastIndex) {
+                            move(at, at + 1); dragging = at + 1; offset -= rowHeight
                         } else if (offset < -rowHeight / 2 && at > 0) {
-                            onMove(at, at - 1); dragging = at - 1; offset += rowHeight
+                            move(at, at - 1); dragging = at - 1; offset += rowHeight
                         }
                     },
                 )

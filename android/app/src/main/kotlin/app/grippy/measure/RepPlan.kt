@@ -59,6 +59,14 @@ class RepPlans private constructor(private val context: Context) {
         write(list)
     }
 
+    /** A weight changed during a session: the plan's item for that exercise at the old weight gets the new one. */
+    fun changeWeight(planId: Long, exerciseId: Long?, old: Double?, kg: Double) {
+        val plan = plan(planId) ?: return
+        val i = plan.items.indexOfFirst { it.exerciseId == exerciseId && it.weightKg == old }
+        if (i < 0) return
+        save(plan.copy(items = plan.items.toMutableList().also { it[i] = it[i].copy(weightKg = kg) }))
+    }
+
     fun delete(id: Long) = write(_plans.value.filterNot { it.id == id })
 
     fun newId(): Long = (_plans.value.maxOfOrNull { it.id } ?: 0) + 1

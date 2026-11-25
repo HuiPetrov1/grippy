@@ -21,6 +21,10 @@ import app.grippy.camera.RepMark
 import app.grippy.camera.Tracking
 import android.os.SystemClock
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -37,13 +41,18 @@ const val REPS_MAX_SECONDS = 1200
  * through [receive]; [drive] runs the steps. Main thread only.
  */
 class RepRun(
-    val sets: List<RepSet>,
+    initialSets: List<RepSet>,
     /** Seconds between tapping Start and counting, to get into position. */
     val startAfter: Int,
     /** Where a new exercise goes when the sets were not started from one. */
     val folderId: Long? = null,
     val planName: String? = null,
+    /** The plan the sets came from: a weight changed during the session is kept in it for next time. */
+    val planId: Long? = null,
 ) {
+    /** The sets in order; their weights can change during the session ([setWeight]). */
+    val sets = mutableStateListOf<RepSet>().apply { addAll(initialSets) }
+
     /** Ready: between sets, waiting for Start (the rest is tracked, never enforced). */
     enum class Stage { Connecting, Waking, Ready, Countdown, Counting, Finishing, Done }
 
@@ -62,6 +71,8 @@ class RepRun(
     ) {
         /** The count that will be saved; the person can correct it before saving. */
         var reps by mutableIntStateOf(marks.size)
+        /** The weight that will be saved; the person can correct it before saving. */
+        var weightKg by mutableStateOf(set.weightKg)
     }
 
     private sealed interface Action {
@@ -70,6 +81,11 @@ class RepRun(
         data object Skip : Action
         data object Finish : Action
     }
+
+    /** The camera's own tally of the set that just ended, still on its way. */
+    private var tallying: Job? = null
+    /** Counting down: start now instead. */
+    private var skipCountdown = false
 
     var stage by mutableStateOf(Stage.Connecting)
         private set
@@ -153,6 +169,24 @@ class RepRun(
     fun finishSession() { actions.trySend(Action.Finish) }
     /** Counting: this set is done (the card was tapped). */
     fun finishSet() { finishRequested = true }
+    /** Counting down: no need to wait, start counting now. */
+    fun startNow() { skipCountdown = true }
+
+    /**
+     * Set [i] is done with [kg] from now on, and so are the sets right after it of the same exercise at
+     * the same weight (the other arm). Returns the weight it had, or null when nothing changed.
+     */
+    fun setWeight(i: Int, kg: Double): Double? {
+        val set = sets.getOrNull(i) ?: return null
+        val old = set.weightKg
+        if (old == kg) return null
+        var j = i
+        while (j < sets.size && sets[j].exerciseId == set.exerciseId && sets[j].weightKg == old) {
+            sets[j] = sets[j].copy(weightKg = kg)
+            j++
+        }
+        return old
+    }
 
     fun restart() {
         results.clear(); signal.clear(); marks.clear()
@@ -198,31 +232,43 @@ class RepRun(
             if (open != null) break
             wakingFor = ((System.nanoTime() - wakeFrom) / 1e9).toInt()
         }
-        while (true) {
-            stage = Stage.Ready
-            when (actions.receive()) {
-                Action.Start -> {
-                    if (allDone) continue
-                    count(client, index, title, cue)
-                    lastDone = index
-                    index++
+        coroutineScope {
+            while (true) {
+                stage = Stage.Ready
+                when (actions.receive()) {
+                    Action.Start -> {
+                        if (allDone) continue
+                        val i = index
+                        count(client, i, title, cue)
+                        lastDone = i
+                        index = i + 1
+                    }
+                    Action.Resume -> {
+                        val again = lastDone ?: continue
+                        count(client, again, title, cue)
+                    }
+                    Action.Skip -> if (!allDone) index++
+                    Action.Finish -> {
+                        // The last set's own tally, if it is still coming, before the review.
+                        if (tallying?.isActive == true) stage = Stage.Finishing
+                        tallying?.join()
+                        break
+                    }
                 }
-                Action.Resume -> {
-                    val again = lastDone ?: continue
-                    count(client, again, title, cue)
-                }
-                Action.Skip -> if (!allDone) index++
-                Action.Finish -> break
             }
         }
         client.send(CamCommand.Sleep)
         stage = Stage.Done
     }
 
-    /** Counts set [i] once; a set that already has a result gets the new reps added after it. */
-    private suspend fun count(client: CamClient, i: Int, title: (RepSet) -> String, cue: (Cue) -> Unit) {
-        val set = sets[i]
+    /**
+     * Counts set [i] once; a set that already has a result gets the new reps added after it. Returns as
+     * soon as the set is finished, with what arrived live; the camera's own tally replaces it when it comes.
+     */
+    private suspend fun CoroutineScope.count(client: CamClient, i: Int, title: (RepSet) -> String, cue: (Cue) -> Unit) {
         countingIndex = i
+        // The previous set's tally first: the camera answers in order, so it is normally already here.
+        tallying?.join()
         val before = results[i]
         resumedFrom = before?.reps ?: 0
         count = 0
@@ -230,42 +276,58 @@ class RepRun(
         signal.clear()
         marks.clear()
         finishRequested = false
-        if (client.link == CamClient.Link.Ready) client.send(CamCommand.Wake(front, title(set)))
+        skipCountdown = false
+        if (client.link == CamClient.Link.Ready) client.send(CamCommand.Wake(front, title(sets[i])))
         stage = Stage.Countdown
-        for (s in startAfter downTo 1) {
+        countdown@ for (s in startAfter downTo 1) {
             countdown = s
             if (s <= 3) cue(Cue.Tick)
-            delay(1000)
+            for (k in 0 until 10) {
+                if (skipCountdown) break@countdown
+                delay(100)
+            }
         }
         countdown = 0
         val done = CompletableDeferred<CamEvent.Summary>()
         summary = done
         val takenAt = System.currentTimeMillis()
-        client.send(CamCommand.Begin(set.hand))
+        client.send(CamCommand.Begin(sets[i].hand))
         val from = System.nanoTime()
         stage = Stage.Counting
         cue(Cue.Go)
         while (!finishRequested && !done.isCompleted) {
-            elapsed = (System.nanoTime() - from) / 1e9
-            if (elapsed >= REPS_MAX_SECONDS) break
-            delay(50)
+            val now = (System.nanoTime() - from) / 1e9
+            // The screen shows seconds: a few updates a second are plenty (each one redraws the card).
+            if (now - elapsed >= 0.25) elapsed = now
+            if (now >= REPS_MAX_SECONDS) break
+            delay(30)
         }
-        stage = Stage.Finishing
-        // Ask for the camera's own tally; if the link is down, what arrived live stands.
-        var tally: CamEvent.Summary? = if (done.isCompleted) done.await() else null
-        var asked = 0
-        while (tally == null && asked < END_TRIES) {
-            if (client.link == CamClient.Link.Ready) client.send(CamCommand.End)
-            tally = withTimeoutOrNull(END_WAIT_MS) { done.await() }
-            asked++
-        }
-        summary = null
-        val counted = tally?.reps ?: marks.toList()
-        val wall = tally?.durationMs?.div(1000.0) ?: elapsed
-        val now = Result(set, activeSeconds(counted, wall), wall, counted, signal.toList(), tally?.tracking ?: tracking, takenAt)
-        results[i] = if (before == null) now else join(before, now)
+        elapsed = (System.nanoTime() - from) / 1e9
+        // On to the rest straight away with what arrived live; the camera's own count follows.
+        if (client.link == CamClient.Link.Ready && !done.isCompleted) client.send(CamCommand.End)
+        val live = Result(sets[i], activeSeconds(marks.toList(), elapsed), elapsed, marks.toList(), signal.toList(), tracking, takenAt)
+        results[i] = if (before == null) live else join(before, live)
         restFrom = SystemClock.elapsedRealtime()
         cue(Cue.Stop)
+        tallying = launch {
+            // Ask for the camera's own tally; if the link is down, what arrived live stands.
+            var tally: CamEvent.Summary? = if (done.isCompleted) done.await() else withTimeoutOrNull(END_WAIT_MS) { done.await() }
+            var asked = 1
+            while (tally == null && asked < END_TRIES) {
+                if (client.link == CamClient.Link.Ready) client.send(CamCommand.End)
+                tally = withTimeoutOrNull(END_WAIT_MS) { done.await() }
+                asked++
+            }
+            if (summary === done) summary = null
+            if (tally == null) return@launch
+            val shown = results[i]
+            val wall = tally.durationMs / 1000.0
+            val now = Result(sets[i], activeSeconds(tally.reps, wall), wall, tally.reps, live.signal, tally.tracking, takenAt)
+            val merged = if (before == null) now else join(before, now)
+            // A weight changed meanwhile stays.
+            shown?.weightKg?.let { merged.weightKg = it }
+            results[i] = merged
+        }
     }
 
     companion object {
@@ -277,8 +339,9 @@ class RepRun(
             val marks = first.marks + second.marks.map { it.copy(tMs = it.tMs + shiftMs) }
             val signal = first.signal + second.signal.map { ForcePoint(it.t + first.wallSeconds, it.kg) }
             val wall = first.wallSeconds + second.wallSeconds
-            return Result(first.set, activeSeconds(marks, wall), wall, marks, signal, second.tracking, first.takenAt).also {
+            return Result(second.set, activeSeconds(marks, wall), wall, marks, signal, second.tracking, first.takenAt).also {
                 it.reps = first.reps + second.reps
+                it.weightKg = second.weightKg
             }
         }
         private const val END_WAIT_MS = 2_500L

@@ -67,13 +67,17 @@ Two phones, both with Grippy. One stands still and watches; the other is the one
 - **Camera sessions:** Measure → "Camera session" keeps plans: exercises in order, each with a weight and
   the arm order (drag to reorder). A session goes set by set: you tap **Start** when ready, tap the card
   to finish the set, and the rest screen shows the rest time (counting up; nothing starts by itself), the
-  next set and **Resume** for a set finished by accident. Each set is saved with its weight. The
+  next set and **Resume** for a set finished by accident. The weight can be changed on the rest screen,
+  the countdown (tap it to start at once) and the counting card (tap the kg); it carries to the other arm
+  and is kept in the plan. Finishing a set goes straight to the rest screen; the camera's own tally
+  replaces the live count when it arrives. Each set is saved with its weight (correctable in the review). The
   exercise drawings (`res/drawable-nodpi/exercise_*.webp`) were made for Grippy with an image model.
 - **Camera phone screen:** the back camera by default; with "Screen off after a set" allowed (device
   admin, lock only) the camera phone switches its screen off when the session ends.
 - **Tuning data:** with "Keep each set's measurements" on, the camera phone writes each set to
   `Android/data/app.grippy/files/traces/` as numbers only (format in `SetTrace.kt`).
-  `adb pull` them and replay one with `tools/repcount/eval.py --bin3` (exactly as the phone counted).
+  "Send the last sets" (camera phone, Settings → Camera phone) zips the newest 12 for the share sheet;
+  or `adb pull` them. Replay one with `tools/repcount/eval.py --bin3` (exactly as the phone counted).
 - **Testing without the main phone:** `scripts/grippy-camtest.py` plays the main phone from a
   PC with Bluetooth: `grippy-camtest.py set 30` wakes the camera, counts for 30 s and prints
   the reps.

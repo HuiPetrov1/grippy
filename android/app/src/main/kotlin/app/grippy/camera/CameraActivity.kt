@@ -95,6 +95,8 @@ class CameraActivity : ComponentActivity() {
     private var fpsFrom = 0.0
     private var aloneSince = 0L
     private var countingFrom = 0.0
+    /** End was asked for and the tally is being made. Main thread. */
+    private var ending = false
 
     private val askCamera = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) bind() else ui.problem = "Grippy needs the camera to count reps. Allow it in Settings."
@@ -266,6 +268,7 @@ class CameraActivity : ComponentActivity() {
 
     private fun begin(hand: Hand) {
         if (ui.state != CamState.Framing && ui.state != CamState.Counting) return
+        ending = false
         ui.side = hand
         ui.count = 0
         ui.elapsed = 0.0
@@ -284,7 +287,14 @@ class CameraActivity : ComponentActivity() {
     }
 
     private fun end() {
-        if (ui.state != CamState.Counting) return
+        if (ui.state != CamState.Counting) {
+            // Asked again (the first answer got lost on the way): the same tally once more.
+            ui.last?.let { CamHub.events.tryEmit(it) }
+            return
+        }
+        // Already ending: the tally is on its way.
+        if (ending) return
+        ending = true
         analysisExecutor.execute {
             val summary = session?.end() ?: return@execute
             trace?.finish(summary); trace = null

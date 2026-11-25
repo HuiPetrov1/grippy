@@ -367,4 +367,20 @@ class RepRunMathTests {
         assertEquals(6.5, RepRun.activeSeconds(marks, whole = 20.0), 1e-9)
         assertEquals(20.0, RepRun.activeSeconds(emptyList(), whole = 20.0), 1e-9)
     }
+
+    @Test
+    fun aWeightChangedForOneArmCarriesToTheOtherArmButNotToTheNextExercise() {
+        val sets = listOf(
+            app.grippy.measure.RepSet(1, "Extension", 5.0, app.grippy.measure.Hand.Left),
+            app.grippy.measure.RepSet(1, "Extension", 5.0, app.grippy.measure.Hand.Right),
+            app.grippy.measure.RepSet(2, "Pronation", 2.0, app.grippy.measure.Hand.Left),
+        )
+        val run = RepRun(sets, 3)
+        assertEquals(5.0, run.setWeight(0, 6.5))
+        assertEquals(listOf(6.5, 6.5, 2.0), run.sets.map { it.weightKg })
+        // Only the right arm: the left one already went at its weight.
+        assertEquals(6.5, run.setWeight(1, 7.0))
+        assertEquals(listOf(6.5, 7.0, 2.0), run.sets.map { it.weightKg })
+        assertEquals(null, run.setWeight(2, 2.0))
+    }
 }

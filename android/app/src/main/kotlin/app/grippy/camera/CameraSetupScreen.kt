@@ -193,6 +193,19 @@ fun CameraSetupScreen(modifier: Modifier = Modifier) {
                     }
                     Switch(keep, { keep = it; CameraRole.setKeepTraces(context, it) }, colors = SwitchDefaults.colors(checkedTrackColor = c.blue))
                 }
+                val kept = remember { SetTrace.count(context) }
+                if (kept > 0) {
+                    HorizontalDivider(color = c.divider)
+                    Row(Modifier.fillMaxWidth().clickable { SetTrace.share(context) }.padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Send the last sets", style = textStyle(15.5.sp, FontWeight.SemiBold, c.link))
+                            Text("$kept kept. Shares the newest ones as one file, to check why a count was off.",
+                                style = textStyle(13.sp, FontWeight.Normal, c.text2))
+                        }
+                        Icon(Icons.Filled.ChevronRight, null, tint = c.text3)
+                    }
+                }
             }
             PrimaryButton("Open the camera now", onClick = { CameraActivity.open(context, byLink = false) })
             Text("Opens the camera on this phone so you can check the view and try the counting without your main phone.",

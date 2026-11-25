@@ -104,6 +104,13 @@ fun RepRunScreen(nav: MeasureNavigator, run: RepRun) {
 
     KeepScreenOn(true)
     BackHandler { confirmQuit = true }
+    val plans = remember { RepPlans.get(context) }
+    fun changeWeight(i: Int, kg: Double) {
+        val set = run.sets.getOrNull(i) ?: return
+        val old = run.setWeight(i, kg) ?: return
+        // Kept in the plan, so the next session starts with it.
+        run.planId?.let { plans.changeWeight(it, set.exerciseId, old, kg) }
+    }
 
     DisposableEffect(client, run) {
         client.onEvent = run::receive
@@ -147,9 +154,9 @@ fun RepRunScreen(nav: MeasureNavigator, run: RepRun) {
             when (run.stage) {
                 RepRun.Stage.Connecting -> Finding(client.link)
                 RepRun.Stage.Waking -> WakingUp(run.wakingFor)
-                RepRun.Stage.Ready -> ReadyBetweenSets(run, data)
-                RepRun.Stage.Countdown -> RepCountdown(run, data)
-                RepRun.Stage.Counting -> CardStack(run, data)
+                RepRun.Stage.Ready -> ReadyBetweenSets(run, data, ::changeWeight)
+                RepRun.Stage.Countdown -> RepCountdown(run, data, ::changeWeight)
+                RepRun.Stage.Counting -> CardStack(run, data, ::changeWeight)
                 RepRun.Stage.Finishing -> {
                     Spacer(Modifier.height(98.dp))
                     CircularProgressIndicator(color = c.blue, strokeWidth = 4.dp, modifier = Modifier.size(46.dp))
@@ -197,7 +204,7 @@ internal fun RepSessionPreview(run: RepRun, data: MeasureSnapshot) {
     Column(Modifier.fillMaxSize().background(c.bg)) {
         TopBar(title = run.planName ?: "Reps · camera", onBack = {})
         Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (run.stage == RepRun.Stage.Counting) CardStack(run, data) else ReadyBetweenSets(run, data)
+            if (run.stage == RepRun.Stage.Counting) CardStack(run, data) { _, _ -> } else ReadyBetweenSets(run, data) { _, _ -> }
         }
         if (run.stage == RepRun.Stage.Ready) {
             Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -230,7 +237,7 @@ private fun armLabel(hand: Hand) = "${hand.label} arm"
 
 /** Between sets: what was just done (can be resumed), how long the rest has been, and what is next. Nothing starts by itself. */
 @Composable
-private fun ReadyBetweenSets(run: RepRun, data: MeasureSnapshot) {
+private fun ReadyBetweenSets(run: RepRun, data: MeasureSnapshot, onWeight: (Int, Double) -> Unit) {
     val c = measureColors()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
         Spacer(Modifier.height(6.dp))
@@ -289,8 +296,11 @@ private fun ReadyBetweenSets(run: RepRun, data: MeasureSnapshot) {
                         Text("Up next · Set ${run.index + 1} of ${run.sets.size}", style = textStyle(14.sp, FontWeight.SemiBold, c.link))
                         Spacer(Modifier.height(4.dp))
                         Text(armLabel(next.hand), style = textStyle(30.sp, FontWeight.Bold, c.text, (-0.5).sp))
-                        Text(listOfNotNull(next.title(data), next.weightKg?.let { kgText(it) }).joinToString(" · "),
-                            style = textStyle(16.sp, FontWeight.Medium, c.text2))
+                        Text(next.title(data), style = textStyle(16.sp, FontWeight.Medium, c.text2))
+                        if (next.weightKg != null) {
+                            Spacer(Modifier.height(8.dp))
+                            WeightStepper(next.weightKg) { kg -> onWeight(run.index, kg) }
+                        }
                     }
                     Spacer(Modifier.width(10.dp))
                     ExerciseArt(next.title(data), 104.dp)
@@ -316,25 +326,31 @@ private fun ReadyBetweenSets(run: RepRun, data: MeasureSnapshot) {
 }
 
 @Composable
-private fun RepCountdown(run: RepRun, data: MeasureSnapshot) {
+private fun RepCountdown(run: RepRun, data: MeasureSnapshot, onWeight: (Int, Double) -> Unit) {
     val c = measureColors()
     val set = run.sets.getOrNull(run.countingIndex) ?: return
-    Spacer(Modifier.height(18.dp))
-    ExerciseArt(set.title(data), 120.dp)
-    Spacer(Modifier.height(12.dp))
-    Text(set.title(data), style = textStyle(20.sp, FontWeight.Bold, c.text), textAlign = TextAlign.Center)
-    Text(listOfNotNull(set.weightKg?.let { kgText(it) }, armLabel(set.hand)).joinToString(" · "), style = textStyle(16.sp, FontWeight.Medium, c.text2))
-    Text(if (run.countdown > 0) "${run.countdown}" else "…", style = textStyle(110.sp, FontWeight.Bold, c.text, (-4).sp))
-    Text("Counting starts in", style = textStyle(14.sp, FontWeight.Normal, c.text2))
-    Spacer(Modifier.height(14.dp))
-    SeenCard(run, Modifier.size(width = 96.dp, height = 128.dp))
-    Spacer(Modifier.height(8.dp))
-    TrackingPill(run.tracking, counting = false)
+    Column(Modifier.fillMaxSize().clickable { run.startNow() }, horizontalAlignment = Alignment.CenterHorizontally) {
+        Spacer(Modifier.height(18.dp))
+        ExerciseArt(set.title(data), 120.dp)
+        Spacer(Modifier.height(12.dp))
+        Text(set.title(data), style = textStyle(20.sp, FontWeight.Bold, c.text), textAlign = TextAlign.Center)
+        Text(armLabel(set.hand), style = textStyle(16.sp, FontWeight.Medium, c.text2))
+        if (set.weightKg != null) {
+            Spacer(Modifier.height(8.dp))
+            WeightStepper(set.weightKg) { kg -> onWeight(run.countingIndex, kg) }
+        }
+        Text(if (run.countdown > 0) "${run.countdown}" else "…", style = textStyle(110.sp, FontWeight.Bold, c.text, (-4).sp))
+        Text("Counting starts in · tap to start now", style = textStyle(14.sp, FontWeight.Normal, c.text2))
+        Spacer(Modifier.height(14.dp))
+        SeenCard(run, Modifier.size(width = 96.dp, height = 128.dp))
+        Spacer(Modifier.height(8.dp))
+        TrackingPill(run.tracking, counting = false)
+    }
 }
 
 /** Counting: the set as a big card (tap it to finish the set), the next sets peeking out above it. */
 @Composable
-private fun CardStack(run: RepRun, data: MeasureSnapshot) {
+private fun CardStack(run: RepRun, data: MeasureSnapshot, onWeight: (Int, Double) -> Unit) {
     val c = measureColors()
     val position = run.countingIndex
     val counting = run.sets.getOrNull(position) ?: return
@@ -344,7 +360,7 @@ private fun CardStack(run: RepRun, data: MeasureSnapshot) {
         next.getOrNull(0)?.let { PeekCard(it, data, Modifier.padding(horizontal = 15.dp, vertical = 0.dp).padding(top = 20.dp)) }
         val top = when (next.size) { 0 -> 0.dp; 1 -> 22.dp; else -> 42.dp }
         OutlinedCard(Modifier.padding(top = top).fillMaxSize(), onClick = { run.finishSet() }, radius = 26.dp, color = c.card) {
-            CountingCard(run, counting, position, next.firstOrNull(), data)
+            CountingCard(run, counting, position, next.firstOrNull(), data, onWeight)
         }
     }
 }
@@ -361,17 +377,27 @@ private fun PeekCard(set: RepSet, data: MeasureSnapshot, modifier: Modifier) {
 }
 
 @Composable
-private fun CountingCard(run: RepRun, set: RepSet, position: Int, next: RepSet?, data: MeasureSnapshot) {
+private fun CountingCard(run: RepRun, set: RepSet, position: Int, next: RepSet?, data: MeasureSnapshot, onWeight: (Int, Double) -> Unit) {
     val c = measureColors()
     val handColor = if (set.hand == Hand.Left) c.left else c.right
+    var editWeight by remember { mutableStateOf(false) }
+    if (editWeight && set.weightKg != null) {
+        WeightDialog(set.weightKg, onDone = { kg -> editWeight = false; onWeight(position, kg) }, onDismiss = { editWeight = false },
+            note = "Also for the next arm, and kept in the plan for next time.")
+    }
     Column(Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             ExerciseArt(set.title(data), 76.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(set.title(data), style = textStyle(19.sp, FontWeight.Bold, c.text), maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(listOfNotNull(set.weightKg?.let { kgText(it) }, armLabel(set.hand)).joinToString(" · "),
-                    style = textStyle(15.sp, FontWeight.Medium, c.text2))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (set.weightKg != null) {
+                        WeightChip(set.weightKg) { editWeight = true }
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(armLabel(set.hand), style = textStyle(15.sp, FontWeight.Medium, c.text2))
+                }
                 Spacer(Modifier.height(5.dp))
                 Text("Set ${position + 1} of ${run.sets.size}", style = textStyle(12.5.sp, FontWeight.SemiBold, Color.White),
                     modifier = Modifier.clip(CircleShape).background(c.blue).padding(horizontal = 10.dp, vertical = 3.dp))
@@ -405,8 +431,10 @@ private fun CountingCard(run: RepRun, set: RepSet, position: Int, next: RepSet?,
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             SeenCard(run, Modifier.size(width = 66.dp, height = 88.dp))
             Spacer(Modifier.width(10.dp))
-            val window = maxOf(12, ceil(run.elapsed + 1).toInt())
-            LiveCurve(run.signal.toList(), window, handColor, c.divider, Modifier.weight(1f).height(88.dp))
+            // The last few seconds, so each rep stays readable however long the set runs.
+            val from = (run.elapsed - LIVE_WINDOW_SEC).coerceAtLeast(0.0)
+            val recent = run.signal.filter { it.t >= from }.map { ForcePoint(it.t - from, it.kg) }
+            LiveCurve(recent, LIVE_WINDOW_SEC.toInt(), handColor, c.divider, Modifier.weight(1f).height(88.dp))
         }
         Spacer(Modifier.height(10.dp))
         val hint = if (run.count == 0) "Counting shows after your 3rd rep (quick small reps: about the 8th)." else null
@@ -478,6 +506,9 @@ private fun SeenCard(run: RepRun, modifier: Modifier = Modifier) {
     }
 }
 
+/** Seconds of movement the live curve shows. */
+private const val LIVE_WINDOW_SEC = 12.0
+
 /** Below this the camera phone misses the turn of a rep that takes under a second. */
 private const val SLOW_CAMERA_FPS = 20
 
@@ -494,7 +525,11 @@ fun RepReviewScreen(nav: MeasureNavigator, run: RepRun) {
     var newName by remember { mutableStateOf("") }
     var saving by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf<RepRun.Result?>(null) }
     BackHandler { confirmDiscard = true }
+    editing?.let { result ->
+        WeightDialog(result.weightKg ?: 0.0, onDone = { kg -> result.weightKg = kg; editing = null }, onDismiss = { editing = null })
+    }
 
     val done = run.results.keys.sorted().mapNotNull { i -> run.results[i] }
     val canSave = !saving && done.isNotEmpty() && (!needsExercise || picked != null || newName.isNotBlank())
@@ -518,8 +553,11 @@ fun RepReviewScreen(nav: MeasureNavigator, run: RepRun) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Dot(color, 7.dp)
                                     Spacer(Modifier.width(6.dp))
-                                    Text(listOfNotNull("${set.hand.label} arm", set.weightKg?.let { kgText(it) }).joinToString(" · "),
-                                        style = textStyle(13.sp, FontWeight.Medium, c.text2))
+                                    Text("${set.hand.label} arm", style = textStyle(13.sp, FontWeight.Medium, c.text2))
+                                    result.weightKg?.let { kg ->
+                                        Spacer(Modifier.width(8.dp))
+                                        WeightChip(kg) { editing = result }
+                                    }
                                 }
                             }
                             Stepper("−", "One rep fewer", enabled = result.reps > 0) { result.reps-- }
@@ -559,7 +597,7 @@ fun RepReviewScreen(nav: MeasureNavigator, run: RepRun) {
                         val exerciseId = r.set.exerciseId ?: chosen!!
                         val session = sessions.getOrPut(exerciseId) { java.util.UUID.randomUUID().toString() }
                         MeasurementEntity.fromReps(exerciseId, session, r.set.hand, RepRun.secondsToSave(r), r.takenAt,
-                            r.signal, r.reps, r.marks, settings.bodyWeightKg, r.set.weightKg)
+                            r.signal, r.reps, r.marks, settings.bodyWeightKg, r.weightKg)
                     }
                     store.save(rows)
                     val exercises = rows.map { it.exerciseId }.distinct()
@@ -592,4 +630,58 @@ private fun Stepper(sign: String, label: String, enabled: Boolean, onClick: () -
     ) {
         Text(sign, style = textStyle(20.sp, FontWeight.SemiBold, if (enabled) c.text else c.text3))
     }
+}
+
+private const val KG_STEP = 0.5
+
+/** "− 5 kg +": steps the weight by half a kilo. */
+@Composable
+internal fun WeightStepper(kg: Double, onChange: (Double) -> Unit) {
+    val c = measureColors()
+    Row(Modifier.clip(CircleShape).background(c.raised), verticalAlignment = Alignment.CenterVertically) {
+        Stepper("−", "Lighter", enabled = kg > 0) { onChange((kg - KG_STEP).coerceAtLeast(0.0)) }
+        Text(kgText(kg), style = textStyle(16.sp, FontWeight.SemiBold, c.text), textAlign = TextAlign.Center, modifier = Modifier.width(66.dp))
+        Stepper("+", "Heavier", enabled = true) { onChange(kg + KG_STEP) }
+    }
+}
+
+/** The weight as a chip that opens [WeightDialog]. */
+@Composable
+private fun WeightChip(kg: Double, onClick: () -> Unit) {
+    val c = measureColors()
+    Text("${kgText(kg)} ✎", style = textStyle(15.sp, FontWeight.SemiBold, c.link),
+        modifier = Modifier.clip(CircleShape).background(c.raised).clickable(onClick = onClick)
+            .semantics { contentDescription = "Weight ${kgText(kg)}, tap to change" }
+            .padding(horizontal = 10.dp, vertical = 4.dp))
+}
+
+@Composable
+private fun WeightDialog(kg: Double, onDone: (Double) -> Unit, onDismiss: () -> Unit, note: String? = null) {
+    val c = measureColors()
+    var value by remember { mutableStateOf(kg) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Weight") },
+        text = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(kgText(value), style = textStyle(44.sp, FontWeight.Bold, c.text))
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(-2.5, -0.5, 0.5, 2.5).forEach { step ->
+                        val label = (if (step > 0) "+" else "−") + kgText(kotlin.math.abs(step)).removeSuffix(" kg")
+                        Box(Modifier.size(width = 58.dp, height = 44.dp).clip(RoundedCornerShape(12.dp)).background(c.raised)
+                            .clickable { value = (value + step).coerceAtLeast(0.0) }, contentAlignment = Alignment.Center) {
+                            Text(label, style = textStyle(16.sp, FontWeight.SemiBold, c.link))
+                        }
+                    }
+                }
+                if (note != null) {
+                    Spacer(Modifier.height(8.dp))
+                    Text(note, style = textStyle(12.5.sp, FontWeight.Normal, c.text3), textAlign = TextAlign.Center)
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onDone(value) }) { Text("Done") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
